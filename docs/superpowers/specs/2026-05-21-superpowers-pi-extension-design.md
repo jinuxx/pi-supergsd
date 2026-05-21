@@ -17,7 +17,7 @@ A Pi extension called `pi-supergsd` that packages a curated, patched subset of t
 1. **Build time:** An `updater.ts` script downloads selected Superpowers skills from GitHub.
 2. It applies **declarative patches** to remove harness-specific concepts (subagents, `TodoWrite`, Claude's `Skill` tool, etc.).
 3. It writes the **patched skills** to a `skills/` directory inside the extension.
-4. **Runtime:** The Pi extension serves skills statically via `resources_discover` and injects the `using-superpowers` guide into the system prompt via `before_agent_start` — no network calls, fast, works offline.
+4. **Runtime:** The Pi extension serves skills statically via `resources_discover` and injects the `using-superpowers` guide into the system prompt via `before_agent_start`. The extension returns `{ systemPrompt: event.systemPrompt + "\n\n" + superpowersGuide }` from the `before_agent_start` handler, which chains with other extensions — no network calls, fast, works offline.
 
 ### Goal
 
@@ -315,8 +315,8 @@ Unit tests in `updater/lib/patcher.test.ts` cover each operation type in isolati
 |---|---|
 | `subagent-driven-development` | Core mechanic is dispatching subagents per task. Pi has no built-in `Task` tool for subagent dispatch. |
 | `dispatching-parallel-agents` | Entirely about parallel subagent dispatch via `Task()` calls. |
-| `executing-plans` | Heavily references `subagent-driven-development` as the preferred execution path; inline version references `TodoWrite`. |
-| `using-git-worktrees` | Pi has its own workspace isolation model (sessions, forks). Git worktrees are not applicable. |
+| `executing-plans` | Included with patches — remove subagent references, TodoWrite, and `using-git-worktrees` dependency |
+| `using-git-worktrees` | Pi has its own workspace isolation model (sessions, forks). Git worktrees are not applicable. Also referenced by `executing-plans` — patch that reference out. |
 
 These could be revisited if Pi's subagent extension becomes a standard, documented dependency. For now they are out of scope.
 
@@ -356,6 +356,7 @@ These could be revisited if Pi's subagent extension becomes a standard, document
 | `receiving-code-review` | `SKILL.md` | Minimal changes |
 | `finishing-a-development-branch` | `SKILL.md` | Minimal changes |
 | `writing-plans` | `SKILL.md` | Remove subagent references |
+| `executing-plans` | `SKILL.md` | Remove subagent references, TodoWrite, and `using-git-worktrees` dependency |
 | `writing-skills` | `SKILL.md`, `anthropic-best-practices.md`, `persuasion-principles.md`, `graphviz-conventions.dot`, `render-graphs.js`, `examples/CLAUDE_MD_TESTING.md` | Remove subagent/TodoWrite references |
 | `using-superpowers` | *(injected as system prompt)* | Major rewrite — patched into `system-prompt.md`, not served as a skill |
 
