@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "updater": "tsx updater/updater.ts",
-    "test:updater": "tsx --test updater/lib/**/*.test.ts"
+    "test:updater": "tsx --test updater/lib/**/*.test.ts",
+    "test": "npm run test:updater"
   },
   "pi": {
     "extensions": [
