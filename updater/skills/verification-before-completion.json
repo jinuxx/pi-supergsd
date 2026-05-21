@@ -1,0 +1,11 @@
+{
+  "name": "verification-before-completion",
+  "source": {
+    "repo": "obra/superpowers",
+    "ref": "main",
+    "path": "skills/verification-before-completion"
+  },
+  "files": [
+    { "path": "SKILL.md", "patches": [] }
+  ]
+}
