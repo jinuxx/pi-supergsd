@@ -14,10 +14,10 @@ A Pi extension called `pi-supergsd` that packages a curated, patched subset of t
 
 ### How It Works
 
-1. **Build time:** An `update.ts` script downloads selected Superpowers skills from GitHub.
+1. **Build time:** An `updater.ts` script downloads selected Superpowers skills from GitHub.
 2. It applies **declarative patches** to remove harness-specific concepts (subagents, `TodoWrite`, Claude's `Skill` tool, etc.).
 3. It writes the **patched skills** to a `skills/` directory inside the extension.
-4. **Runtime:** The Pi extension serves those skills statically via `resources_discover` — no network calls, fast, works offline.
+4. **Runtime:** The Pi extension serves skills statically via `resources_discover` and injects the `using-superpowers` guide into the system prompt via `before_agent_start` — no network calls, fast, works offline.
 
 ### Goal
 
@@ -31,6 +31,7 @@ Pi users get high-quality Superpowers skills (brainstorming, TDD, debugging, cod
 pi-supergsd/
 ├── index.ts                    # Pi extension entry point
 ├── package.json                # Extension metadata + npm scripts
+├── system-prompt.md            # Patched using-superpowers content (injected into system prompt)
 ├── updater/
 │   ├── updater.ts              # Thin entry point script
 │   ├── common-patch.json       # Patches applied to EVERY file
@@ -46,30 +47,39 @@ pi-supergsd/
 │       ├── verification-before-completion.json
 │       ├── requesting-code-review.json
 │       ├── receiving-code-review.json
-│       ├── using-git-worktrees.json
 │       ├── finishing-a-development-branch.json
 │       ├── writing-plans.json
-│       ├── writing-skills.json
-│       └── using-superpowers.json
+│       └── writing-skills.json
 └── skills/                     # Generated at build time (committed)
     ├── brainstorming/
     │   ├── SKILL.md
-    │   └── references/
-    │       └── testing-anti-patterns.md
+    │   ├── visual-companion.md
+    │   └── scripts/
+    │       ├── frame-template.html
+    │       ├── helper.js
+    │       ├── server.cjs
+    │       ├── start-server.sh
+    │       └── stop-server.sh
     ├── systematic-debugging/
     │   ├── SKILL.md
     │   ├── root-cause-tracing.md
     │   ├── defense-in-depth.md
-    │   └── condition-based-waiting.md
+    │   ├── condition-based-waiting.md
+    │   ├── condition-based-waiting-example.ts
+    │   └── find-polluter.sh
     └── ...
 ```
 
 ### 2.1 Extension (`index.ts`)
 
-Exports a default factory function. On `resources_discover`, discovers all subdirectories under `skills/` and returns them as `skillPaths`.
+The extension does two things at runtime:
+
+1. **Serves skills** via `resources_discover` — discovers all subdirectories under `skills/` and returns them as `skillPaths`.
+2. **Injects `using-superpowers` into the system prompt** via `before_agent_start` — reads the patched `system-prompt.md` and appends it to the system prompt, so the agent knows how to find and use skills from the start of every conversation.
 
 ```typescript
 import { dirname, join } from "node:path";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
@@ -80,12 +90,53 @@ export default function (pi: ExtensionAPI) {
     const skillDir = join(baseDir, "skills");
     return { skillPaths: [skillDir] };
   });
+
+  const superpowersGuide = readFileSync(
+    join(baseDir, "system-prompt.md"),
+    "utf-8"
+  );
+
+  pi.on("before_agent_start", (event) => {
+    return {
+      systemPrompt: event.systemPrompt + "\n\n" + superpowersGuide,
+    };
+  });
 }
 ```
 
-No runtime network calls. No dynamic fetching. Pure static file serving.
+No runtime network calls. No dynamic fetching. Pure static file serving + prompt injection.
 
-### 2.2 Skill Definition File (`updater/skills/<name>.json`)
+### 2.2 System Prompt Content (`system-prompt.md`)
+
+The `using-superpowers` skill is not served as a regular skill. Instead, it is patched and written to `system-prompt.md` at the repository root. The extension reads this file at load time and injects its contents into every system prompt via `before_agent_start`.
+
+This matches how Superpowers works in Claude Code — the "using superpowers" guide is foundational behavior, not an on-demand skill. It teaches the agent how to discover, load, and apply skills before any task begins.
+
+The `using-superpowers` definition in `updater/skills/` has a special `output` field:
+
+```json
+{
+  "name": "using-superpowers",
+  "source": {
+    "repo": "obra/superpowers",
+    "ref": "main",
+    "path": "skills/using-superpowers"
+  },
+  "output": "system-prompt.md",
+  "files": [
+    {
+      "path": "SKILL.md",
+      "patches": [
+        { "op": "replace", "find": "Skill tool", "replace": "read tool" }
+      ]
+    }
+  ]
+}
+```
+
+When `output` is set, the updater concatenates all patched files and writes to the specified path instead of `skills/{name}/`.
+
+### 2.3 Skill Definition File (`updater/skills/<name>.json`)
 
 Each file is a **standalone skill definition** — no root manifest needed.
 
@@ -128,7 +179,9 @@ Each file is a **standalone skill definition** — no root manifest needed.
     { "path": "SKILL.md", "patches": [] },
     { "path": "root-cause-tracing.md", "patches": [] },
     { "path": "defense-in-depth.md", "patches": [] },
-    { "path": "condition-based-waiting.md", "patches": [] }
+    { "path": "condition-based-waiting.md", "patches": [] },
+    { "path": "condition-based-waiting-example.ts", "patches": [] },
+    { "path": "find-polluter.sh", "patches": [] }
   ]
 }
 ```
@@ -141,11 +194,12 @@ Each file is a **standalone skill definition** — no root manifest needed.
 | `source.repo` | string | Yes | GitHub repo (`owner/repo`) |
 | `source.ref` | string | Yes | Git ref (branch, tag, or SHA) |
 | `source.path` | string | Yes | Path within repo to skill directory |
+| `output` | string | No | Output path override. If set, write patched content here instead of `skills/{name}/` |
 | `files` | array | Yes | List of files to fetch and patch |
 | `files[].path` | string | Yes | Relative path within skill directory |
 | `files[].patches` | array | Yes | Ordered list of patch ops (empty array = fetch only) |
 
-### 2.3 Common Patch (`updater/common-patch.json`)
+### 2.4 Common Patch (`updater/common-patch.json`)
 
 Applied to **every fetched file** before per-file patches:
 
@@ -159,7 +213,7 @@ Applied to **every fetched file** before per-file patches:
 ]
 ```
 
-### 2.4 Patch Engine (`updater/lib/patcher.ts`)
+### 2.5 Patch Engine (`updater/lib/patcher.ts`)
 
 The patch engine is a pure function with no side effects — all replacement logic lives here:
 
@@ -184,7 +238,7 @@ Returns the patched content plus a list of patches that failed to match (for rep
 1. Fetch raw content from GitHub
 2. Apply `common-patch.json` operations in order
 3. Apply per-file `patches` operations in order
-4. Write result to `skills/{name}/{file-path}`
+4. Write result to `skills/{name}/{file-path}` (or `output` path if specified)
 
 ---
 
@@ -192,15 +246,15 @@ Returns the patched content plus a list of patches that failed to match (for rep
 
 The `updater.ts` script runs in this sequence:
 
-1. **Discover skill definitions** — reads all `update/skills/*.json` files.
-2. **Load common patch** — reads `update/common-patch.json`.
+1. **Discover skill definitions** — reads all `updater/skills/*.json` files.
+2. **Load common patch** — reads `updater/common-patch.json`.
 3. **For each skill definition:**
    a. **Resolve source URL** — build `https://raw.githubusercontent.com/{repo}/{ref}/{path}/`
    b. **For each file in `files` array:**
       i. `fetch()` the raw file from GitHub.
       ii. Apply **common patches** in order.
       iii. Apply **per-file patches** in order.
-      iv. Write result to `skills/{skill-name}/{file-path}`.
+      iv. Write result to `skills/{skill-name}/{file-path}` (or `output` path if set).
 4. **Report summary** — list fetched skills, files per skill, patch count, any failures.
 
 **Example flow for `systematic-debugging`:**
@@ -211,6 +265,8 @@ updater/skills/systematic-debugging.json
   → fetch https://raw.githubusercontent.com/obra/superpowers/main/skills/systematic-debugging/root-cause-tracing.md
   → fetch .../defense-in-depth.md
   → fetch .../condition-based-waiting.md
+  → fetch .../condition-based-waiting-example.ts
+  → fetch .../find-polluter.sh
   → apply common-patch.json to each
   → apply per-file patches to each
   → write to skills/systematic-debugging/{SKILL.md, root-cause-tracing.md, ...}
@@ -241,7 +297,7 @@ updater/skills/systematic-debugging.json
 |---|---|
 | **Unit: patch application** | Small test harness that feeds known input + patches through `applyPatches()`, asserts expected output. Tests each operation type in isolation and in combination. |
 | **Integration: full update run** | Run `npm run updater`, verify `skills/` directory structure matches definitions, spot-check 2–3 files for expected replacements (e.g., "Claude Code" → "Pi"). |
-| **Regression: upstream drift** | A CI workflow (GitHub Actions) that runs `npm run update` nightly against `obra/superpowers@main`. Fails if any patch no longer matches (catches upstream text changes early). |
+| **Regression: upstream drift** | A CI workflow (GitHub Actions) that runs `npm run updater` nightly against `obra/superpowers@main`. Fails if any patch no longer matches (catches upstream text changes early). |
 
 The patch engine is a pure function in `updater/lib/patcher.ts`:
 
@@ -249,7 +305,7 @@ The patch engine is a pure function in `updater/lib/patcher.ts`:
 function applyPatches(content: string, patches: Patch[]): { result: string; unmatched: Patch[] };
 ```
 
-Unit tests in `updater/lib/patcher.test.ts` cover each operation type in isolation, combinations, and edge cases (no match, overlapping rules, regex capture groups). No network calls needed. |
+Unit tests in `updater/lib/patcher.test.ts` cover each operation type in isolation, combinations, and edge cases (no match, overlapping rules, regex capture groups). No network calls needed.
 
 ---
 
@@ -260,6 +316,7 @@ Unit tests in `updater/lib/patcher.test.ts` cover each operation type in isolati
 | `subagent-driven-development` | Core mechanic is dispatching subagents per task. Pi has no built-in `Task` tool for subagent dispatch. |
 | `dispatching-parallel-agents` | Entirely about parallel subagent dispatch via `Task()` calls. |
 | `executing-plans` | Heavily references `subagent-driven-development` as the preferred execution path; inline version references `TodoWrite`. |
+| `using-git-worktrees` | Pi has its own workspace isolation model (sessions, forks). Git worktrees are not applicable. |
 
 These could be revisited if Pi's subagent extension becomes a standard, documented dependency. For now they are out of scope.
 
@@ -291,24 +348,23 @@ These could be revisited if Pi's subagent extension becomes a standard, document
 
 | Skill | Files | Notes |
 |---|---|---|
-| `brainstorming` | `SKILL.md` | Remove TodoWrite, adapt `writing-plans` reference |
-| `test-driven-development` | `SKILL.md`, `references/testing-anti-patterns.md` | Remove subagent references in examples |
-| `systematic-debugging` | `SKILL.md`, `root-cause-tracing.md`, `defense-in-depth.md`, `condition-based-waiting.md` | Update tool references |
+| `brainstorming` | `SKILL.md`, `visual-companion.md`, `scripts/*` | Remove TodoWrite, adapt `writing-plans` reference; scripts are visual companion assets |
+| `test-driven-development` | `SKILL.md`, `testing-anti-patterns.md` | Remove subagent references in examples |
+| `systematic-debugging` | `SKILL.md`, `root-cause-tracing.md`, `defense-in-depth.md`, `condition-based-waiting.md`, `condition-based-waiting-example.ts`, `find-polluter.sh` | Update tool references |
 | `verification-before-completion` | `SKILL.md` | Minimal changes |
 | `requesting-code-review` | `SKILL.md`, `code-reviewer.md` | Remove subagent dispatch references |
 | `receiving-code-review` | `SKILL.md` | Minimal changes |
-| `using-git-worktrees` | `SKILL.md` | Update native tool references for Pi |
 | `finishing-a-development-branch` | `SKILL.md` | Minimal changes |
 | `writing-plans` | `SKILL.md` | Remove subagent references |
-| `writing-skills` | `SKILL.md`, `references/anthropic-best-practices.md` | Remove subagent/TodoWrite references |
-| `using-superpowers` | `SKILL.md` | Major rewrite — this is the "getting started" skill that teaches how to use skills in Pi |
+| `writing-skills` | `SKILL.md`, `anthropic-best-practices.md`, `persuasion-principles.md`, `graphviz-conventions.dot`, `render-graphs.js`, `examples/CLAUDE_MD_TESTING.md` | Remove subagent/TodoWrite references |
+| `using-superpowers` | *(injected as system prompt)* | Major rewrite — patched into `system-prompt.md`, not served as a skill |
 
 ---
 
 ## 9. Future Work (Post v1)
 
-- **`--clean` flag** for `update.ts` to remove skills no longer in definitions.
+- **`--clean` flag** for `updater.ts` to remove skills no longer in definitions.
 - **CI workflow** for nightly upstream drift detection.
 - **Version pinning** — allow `source.ref` to be a specific commit SHA for reproducible builds.
 - **Subagent skills** — revisit `subagent-driven-development`, `dispatching-parallel-agents`, `executing-plans` if Pi's subagent extension becomes standard.
-- **Patch validation mode** — `npm run update -- --check` that validates all patches match without writing files (useful for CI).
+- **Patch validation mode** — `npm run updater -- --check` that validates all patches match without writing files (useful for CI).
