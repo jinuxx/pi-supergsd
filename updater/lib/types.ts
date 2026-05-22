@@ -18,15 +18,8 @@ export interface SkillFile {
   patches: Patch[];
 }
 
-export interface SkillSource {
-  repo: string;
-  ref: string;
-  path: string;
-}
-
 export interface SkillDefinition {
   name: string;
-  source: SkillSource;
-  output?: string;
-  files: SkillFile[];
+  files?: SkillFile[];
+  exclude?: string[];
 }
