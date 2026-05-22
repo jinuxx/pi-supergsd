@@ -1,7 +1,5 @@
 [
   { "op": "replace", "find": "Claude Code", "replace": "Pi" },
-  { "op": "replace", "find": "the Skill tool", "replace": "the read tool" },
   { "op": "replace", "find": "superpowers:", "replace": "/skill:" },
-  { "op": "replace", "find": "TodoWrite", "replace": "a todo list" },
-  { "op": "regex-replace", "find": "Task\\(\"", "replace": "subagent dispatch (\"" }
+  { "op": "replace", "find": "TodoWrite", "replace": "a todo list" }
 ]

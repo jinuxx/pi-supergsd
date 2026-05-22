@@ -9,6 +9,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyPatches } from './lib/patcher.js';
 import { superpowersUpdate, superpowersGetSkill, superpowersGetFile } from './lib/source.js';
+
+const DEBUG = !!process.env.DEBUG;
 import type { SkillDefinition, Patch } from './lib/types.js';
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
@@ -71,17 +73,26 @@ async function main(): Promise<void> {
       const raw = superpowersGetFile(repoPath);
       const perFilePatches = getPatchesForFile(def, relativePath);
 
-      // Per-file patches first (against original content), then common patches
-      const mergedPatches = [...perFilePatches, ...commonPatches];
-      const { result, unmatched } = applyPatches(raw, mergedPatches);
+      // Per-file patches first (against original upstream content)
+      const { result: afterPerFile, unmatched: perFileUnmatched } = applyPatches(raw, perFilePatches);
+
+      // Common patches second (best-effort — only warn if unmatched)
+      const { result, unmatched: commonUnmatched } = applyPatches(afterPerFile, commonPatches);
 
       totalPatches += perFilePatches.length;
-      failedPatches += unmatched.length;
+      failedPatches += perFileUnmatched.length;
 
-      for (const u of unmatched) {
+      for (const u of perFileUnmatched) {
         console.warn(
           `    WARNING: patch did not match in ${relativePath}: ${JSON.stringify(u)}`
         );
+      }
+      for (const u of commonUnmatched) {
+        if (DEBUG) {
+          console.warn(
+            `    (common patch skipped in ${relativePath}: ${JSON.stringify(u)})`
+          );
+        }
       }
 
       const fileOutputPath = join(outputPath, relativePath);
