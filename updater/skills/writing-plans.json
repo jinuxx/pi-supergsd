@@ -21,6 +21,11 @@
         {
           "op": "delete-line",
           "find": "Subagent-Driven"
+        },
+        {
+          "op": "replace",
+          "find": "Two execution options:",
+          "replace": "Execution approach:"
         }
       ]
     }

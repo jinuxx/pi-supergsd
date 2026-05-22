@@ -134,7 +134,7 @@ If you find issues, fix them inline. No need to re-review — just fix and move 
 
 After saving the plan, offer execution choice:
 
-**"Plan complete and saved to `docs/superpowers/plans/<filename>.md`. Two execution options:**
+**"Plan complete and saved to `docs/superpowers/plans/<filename>.md`. Execution approach:**
 
 
 **2. Inline Execution** - Execute tasks in this session using executing-plans, batch execution with checkpoints
