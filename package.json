@@ -7,7 +7,8 @@
     "updater": "tsx updater/updater.ts",
     "test:updater": "tsx --test updater/lib/patcher.test.ts updater/lib/source.test.ts",
     "test:package": "tsx --test scripts/publishable-package.test.ts",
-    "test": "npm run test:updater && npm run test:package",
+    "test:release": "tsx --test scripts/bump-version.test.ts",
+    "test": "npm run test:updater && npm run test:package && npm run test:release",
     "verify": "npm test && npm run updater && git diff --exit-code -- skills && npm pack --dry-run"
   },
   "keywords": [
