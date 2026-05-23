@@ -1,6 +1,6 @@
 ---
 name: writing-plans
-description: Use when you have a spec or requirements for a multi-step task, before touching code
+description: Use when you have a spec, requirements, or selected roadmap phase for a multi-step task, before touching code
 ---
 
 # Writing Plans
@@ -15,11 +15,16 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 
 **Save plans to:** `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`
+- For roadmap phases: `docs/superpowers/plans/YYYY-MM-DD-<feature-name>-phase-N-<phase-name>.md`
 - (User preferences for plan location override this default)
 
 ## Scope Check
 
-If the spec covers multiple independent subsystems, it should have been broken into sub-project specs during brainstorming. If it wasn't, suggest breaking this into separate plans — one per subsystem. Each plan should produce working, testable software on its own.
+**Roadmap-aware planning:** If a roadmap exists, write a detailed implementation plan for exactly one selected phase. Default to Phase 1, or the next sequential unplanned phase if earlier phase plans already exist. Do not combine phases unless the user explicitly asks. Read the roadmap, identify the target phase in the plan header, and treat other phases as out of scope. If the target phase is unclear, ask before planning.
+
+Each phase plan must leave the project in a sensible intermediate state after execution: functionality not broken, tests/CI expected green, and no half-migrations or dangling integrations.
+
+If the spec covers multiple independent subsystems, it should have been broken into sub-project specs or a multi-phase roadmap during brainstorming. If it wasn't, suggest breaking this into separate plans or creating a roadmap first. Each plan should produce working, testable software on its own.
 
 ## File Structure
 
@@ -55,6 +60,10 @@ This structure informs the task decomposition. Each task should produce self-con
 **Architecture:** [2-3 sentences about approach]
 
 **Tech Stack:** [Key technologies/libraries]
+
+**Roadmap:** [Path to roadmap, or "None"]
+
+**Phase:** [Phase N: Name, or "Single-plan implementation"]
 
 ---
 ```
@@ -122,26 +131,26 @@ Every step must contain the actual content an engineer needs. These are **plan f
 
 After writing the complete plan, look at the spec with fresh eyes and check the plan against it. This is a checklist you run yourself — not a subagent dispatch.
 
-**1. Spec coverage:** Skim each section/requirement in the spec. Can you point to a task that implements it? List any gaps.
+**1. Spec/roadmap coverage:** Skim each section/requirement in the spec. Can you point to a task that implements it? If working from a roadmap, confirm this plan covers the selected phase and excludes later phases. List any gaps.
 
 **2. Placeholder scan:** Search your plan for red flags — any of the patterns from the "No Placeholders" section above. Fix them.
 
 **3. Type consistency:** Do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.
 
+**4. Phase boundary health:** If working from a roadmap, will executing this phase leave the project functional, coherent, and expected-green without half-migrations or dangling integrations? If not, reshape the plan before saving.
+
 If you find issues, fix them inline. No need to re-review — just fix and move on. If you find a spec requirement with no task, add the task.
 
 ## Execution Handoff
 
-After saving the plan, offer execution choice:
+After saving the plan, offer execution with phase-boundary clarity:
 
-**"Plan complete and saved to `docs/superpowers/plans/<filename>.md`. Two execution options:**
+**"Plan complete and saved to `docs/superpowers/plans/<filename>.md`. Ready to execute it using /skill:executing-plans?"**
 
+If this plan covers a roadmap phase, add:
 
-**2. Inline Execution** - Execute tasks in this session using executing-plans, batch execution with checkpoints
+**"This plan intentionally stops at `[Phase N: Name]`. Future roadmap phases need separate detailed plans."**
 
-**Which approach?"**
-
-
-**If Inline Execution chosen:**
+**If execution chosen:**
 - **REQUIRED SUB-SKILL:** Use /skill:executing-plans
 - Batch execution with checkpoints for review
