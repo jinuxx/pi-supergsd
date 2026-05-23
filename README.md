@@ -27,12 +27,7 @@ Releases are published through the manual GitHub Actions workflow in `.github/wo
 ## Credits and attribution
 
 - Skill content originates from [obra/superpowers](https://github.com/obra/superpowers).
-- This repository curates, patches, and packages a subset of that upstream material for Pi.
-- Additional ideas and release-process inspiration were informed by [gsd-build/gsd-2](https://github.com/gsd-build/gsd-2).
-
-## Non-affiliation
-
-This project is not affiliated with, endorsed by, or part of the GSD project.
+- Context-management ideas were inspired by [gsd-build/gsd-2](https://github.com/gsd-build/gsd-2).
 
 ## License
 
