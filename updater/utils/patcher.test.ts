@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { applyPatches } from './patcher.js';
+import { applyPatches } from './index.js';
+import type { Patch } from './index.js';
 
 
 describe('applyPatches', () => {
@@ -80,7 +81,7 @@ describe('applyPatches', () => {
 
   it('throws on invalid patch operation', () => {
     assert.throws(() => {
-      applyPatches('test', [{ op: 'invalid' as any, find: 'x', replace: 'y' }]);
+      applyPatches('test', [{ op: 'invalid', find: 'x', replace: 'y' } as unknown as Patch]);
     }, /Invalid patch operation/);
   });
 });

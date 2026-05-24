@@ -1,18 +1,12 @@
 import { execFile } from 'node:child_process';
+
 import { promisify } from 'node:util';
+
 import { readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+
 import { join } from 'node:path';
+
 import { tmpdir } from 'node:os';
-
-const execFileAsync = promisify(execFile);
-
-const REPO = 'obra/superpowers';
-const REF = 'main';
-const CACHE_DIR = join(tmpdir(), 'pi-supergsd-updater', 'superpowers-main');
-
-function cacheDir(): string {
-  return process.env.PI_SUPERGSD_CACHE_DIR || CACHE_DIR;
-}
 
 export async function superpowersUpdate(): Promise<void> {
   const dir = cacheDir();
@@ -74,3 +68,15 @@ export function superpowersGetFile(filePath: string): string {
   const dir = cacheDir();
   return readFileSync(join(dir, filePath), 'utf-8');
 }
+
+const REPO = 'obra/superpowers';
+
+const REF = 'main';
+
+function cacheDir(): string {
+  return process.env.PI_SUPERGSD_CACHE_DIR || CACHE_DIR;
+}
+
+const CACHE_DIR = join(tmpdir(), 'pi-supergsd-updater', 'superpowers-main');
+
+const execFileAsync = promisify(execFile);

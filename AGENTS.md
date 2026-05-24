@@ -24,12 +24,17 @@ updater/
 ## Commands
 
 ```bash
+npm run lint          # Lint TypeScript sources
+npm run fix           # Lint + autofix
 npm test              # All tests (updater/ + scripts/)
 npm run updater       # Regenerate skills from upstream + patches
 npx tsc --noEmit      # Type-check updater/ + scripts/
+npm run verify        # Full gate: lint → tsc → test → updater → skill drift → pack
 ```
 
 The updater exits non-zero if any patch fails to match — intentional drift detection.
+
+**Commit sequence:** `fix` first to autofix what it can, then `verify` for the full gate (lint → tsc → test → updater → skill drift → pack). Never skip `fix`.
 
 ## Adding or modifying a skill
 
@@ -38,7 +43,9 @@ The updater exits non-zero if any patch fails to match — intentional drift det
 1. Create `updater/skills/<name>.json` (see existing for format)
 2. `npm run updater`
 3. Verify output in `skills/<name>/`
-4. Commit definition + generated files
+4. `npm run fix` — autofix lint issues first
+5. `npm run verify` — full gate before commit
+6. Commit definition + generated files
 
 ### Custom skills
 

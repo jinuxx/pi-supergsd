@@ -2,7 +2,7 @@ import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { superpowersUpdate, superpowersGetSkill, superpowersGetFile } from './source.js';
+import { superpowersUpdate, superpowersGetSkill, superpowersGetFile } from './index.js';
 
 describe('source', () => {
   before(async () => {
