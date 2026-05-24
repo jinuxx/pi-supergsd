@@ -7,11 +7,8 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { applyPatches } from './lib/patcher.js';
-import { superpowersUpdate, superpowersGetSkill, superpowersGetFile } from './lib/source.js';
-
-const DEBUG = !!process.env.DEBUG;
-import type { SkillDefinition, Patch } from './lib/types.js';
+import { applyPatches, superpowersUpdate, superpowersGetSkill, superpowersGetFile } from './utils/index.js';
+import type { SkillDefinition, Patch } from './utils/index.js';
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
 const projectDir = join(baseDir, '..');
@@ -88,7 +85,7 @@ async function main(): Promise<void> {
         );
       }
       for (const u of commonUnmatched) {
-        if (DEBUG) {
+        if (process.env.DEBUG) {
           console.warn(
             `    (common patch skipped in ${relativePath}: ${JSON.stringify(u)})`
           );

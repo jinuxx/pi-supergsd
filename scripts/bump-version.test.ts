@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { computeNext, formatVersion, parseVersion } from './bump-version.ts';
+import { computeNext, formatVersion, parseVersion } from './bump-version.js';
 
 test('parseVersion reads MAJOR.MINOR.PATCH strings', () => {
   assert.deepEqual(parseVersion('1.2.3'), { major: 1, minor: 2, patch: 3 });
