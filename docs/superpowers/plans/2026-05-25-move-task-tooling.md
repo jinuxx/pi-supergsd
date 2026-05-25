@@ -120,7 +120,7 @@ Delete:
 - [ ] **Step 8: Remove unused imports**
 
 Remove `import { Type } from 'typebox';` if no longer referenced.
-Remove `defineTool` and `ToolDefinition` from the pi-coding-agent import if no longer used (they still are — `createReturnCommand` doesn't use them directly, but check). Actually `defineTool` and `ToolDefinition` were only for `createPushTaskTool`. Remove them.
+Remove `defineTool` and `ToolDefinition` from the pi-coding-agent import — they were only used by `createPushTaskTool`, which is deleted above.
 
 - [ ] **Step 9: Run lint + typecheck**
 
@@ -1294,7 +1294,6 @@ git add index.test.ts && git commit -m "test: add task tooling tests"
 **Files:**
 - Modify: `package.json`
 - Modify: `tsconfig.json`
-- Modify: `eslint.config.js`
 
 - [ ] **Step 1: Update `package.json`**
 
@@ -1333,11 +1332,7 @@ Add `"index.ts"`, `"index.test.ts"` to includes:
 "include": ["index.ts", "index.test.ts", "updater/**/*.ts", "scripts/**/*.ts"]
 ```
 
-- [ ] **Step 3: Update `eslint.config.js`**
-
-The `ignores` list currently excludes `skills/**`. The new `index.ts` and `index.test.ts` are at root and should not be excluded. No change needed — they're not in any ignored directory.
-
-- [ ] **Step 4: Run lint + typecheck**
+- [ ] **Step 3: Run lint + typecheck**
 
 ```bash
 npm run lint && npx tsc --noEmit
@@ -1361,53 +1356,103 @@ git add package.json tsconfig.json && git commit -m "config: add extension entry
 - Modify: `updater/skills/requesting-code-review.json`
 - Modify: `updater/skills/writing-skills.json`
 
-For each file, replace conditional `push-task` patches with unconditional versions. Key changes:
-- Remove `**If the push-task tool is available:**` header
-- Remove `**Otherwise:**` fallback lines
-- Update `/return` → `/finish-task`
+For each file, edit the `replace` value in the JSON patch directly. The `find` value stays unchanged — only the `replace` string changes. Below each change shows old → new for the `replace` field.
 
 - [ ] **Step 1: Update `updater/skills/brainstorming.json`**
 
-In the SKILL.md file's patches array, find the patch where `find` contains `"7. **Spec self-review** — quick inline check"`. In that patch's `replace`, drop the conditional wrapper and change `/return` to `/finish-task`.
+In the SKILL.md file's patches array, locate the patch where `find` contains `"7. **Spec self-review** — quick inline check"`. Change its `replace` from:
 
-**Change in replace text:**
-- Delete `**If the \`push-task\` tool is available:**\n`
-- Delete `\n**Otherwise:**\nRun the Spec Self-Review checklist inline (see below.)`
-- Change `/return` to `/finish-task` (in step 3)
+```
+"7. **Spec self-review** — check the spec for completeness and consistency before user review\n\n**If the `push-task` tool is available:**\n1. Call `push-task({ prompt: \"<content from spec-document-reviewer-prompt.md>\", context: \"fresh\" })`\n   The prompt must be self-contained — it cannot reference \"above\" or prior\n   conversation, because `/start-task` provides empty context.\n2. Tell the user: \"Run `/start-task` for a fresh-context review of the spec.\"\n3. After the user runs `/return`, incorporate the review findings and fix any gaps\n   in the spec before proceeding to Step 8.\n\n**Otherwise:**\nRun the Spec Self-Review checklist inline (see below.)"
+```
+
+To:
+
+```
+"7. **Spec self-review** — check the spec for completeness and consistency before user review\n\n1. Call `push-task({ prompt: \"<content from spec-document-reviewer-prompt.md>\", context: \"fresh\" })`\n   The prompt must be self-contained — it cannot reference \"above\" or prior\n   conversation, because `/start-task` provides empty context.\n2. Tell the user: \"Run `/start-task` for a fresh-context review of the spec.\"\n3. After the user runs `/finish-task`, incorporate the review findings and fix any gaps\n   in the spec before proceeding to Step 8."
+```
 
 - [ ] **Step 2: Update `updater/skills/writing-plans.json`**
 
-In the SKILL.md file's patches array, find the patch where `find` contains `"## Self-Review"`. In that patch's `replace`:
-- Delete `**If the \`push-task\` tool is available:**\n`
-- Delete `\n**Otherwise:**\nRun the Self-Review checklist inline.`
-- Change `/return` to `/finish-task`
+In the SKILL.md file's patches array, locate the patch where `find` contains `"## Self-Review"`. Change its `replace` from:
+
+```
+"## Self-Review\n\n**Fresh-context plan review (optional but recommended):**\n\n**If the `push-task` tool is available:**\n1. Call `push-task({ prompt: \"<content from plan-document-reviewer-prompt.md>\", context: \"fresh\" })`\n2. Tell the user: \"Run `/start-task` for a fresh-context review of the plan.\"\n3. After `/return`, fix any gaps before committing the plan.\n\n**Otherwise:**\nRun the Self-Review checklist inline."
+```
+
+To:
+
+```
+"## Self-Review\n\n**Fresh-context plan review (optional but recommended):**\n\n1. Call `push-task({ prompt: \"<content from plan-document-reviewer-prompt.md>\", context: \"fresh\" })`\n2. Tell the user: \"Run `/start-task` for a fresh-context review of the plan.\"\n3. After `/finish-task`, fix any gaps before committing the plan."
+```
 
 - [ ] **Step 3: Update `updater/skills/requesting-code-review.json`**
 
-In the SKILL.md file, two patches reference push-task:
+Two patches in SKILL.md need changes.
 
-Patch 1: `find` contains `"**2. Dispatch code reviewer subagent"`. In the `replace`:
-- Delete `**If the \`push-task\` tool is available:**\n`
-- Delete `\n**Otherwise:**\nUse the code-reviewer.md template for your review process.`
-- Change `/return` to `/finish-task`
+**Patch 1:** Find where `find` contains `"**2. Dispatch code reviewer subagent"`. Change `replace` from:
 
-Patch 2: `find` contains `"[Dispatch code reviewer subagent]"`. In the `replace`:
-- Change `/return` to `/finish-task` (in the `[After /return, review output]` line)
+```
+"**2. Request code review:**\n\n**If the `push-task` tool is available:**\n1. Call `push-task({ prompt: \"<review prompt with BASE_SHA, HEAD_SHA, description>\", context: \"fresh\" })`\n2. Tell the user: \"Run `/start-task` for a fresh-context code review.\"\n3. After `/return`, read the review output and act on feedback.\n\n**Otherwise:**\nUse the code-reviewer.md template for your review process."
+```
+
+To:
+
+```
+"**2. Request code review:**\n\n1. Call `push-task({ prompt: \"<review prompt with BASE_SHA, HEAD_SHA, description>\", context: \"fresh\" })`\n2. Tell the user: \"Run `/start-task` for a fresh-context code review.\"\n3. After `/finish-task`, read the review output and act on feedback."
+```
+
+**Patch 2:** Find where `find` contains `"[Dispatch code reviewer subagent]"`. Change `replace` from:
+
+```
+"[Call push-task with review prompt]\n`push-task({ prompt: \"You are a Senior Code Reviewer... [review body from code-reviewer.md, filled with BASE_SHA=a7981ec, HEAD_SHA=3df7661, DESCRIPTION=Added verifyIndex() and repairIndex() with 4 issue types, PLAN_OR_REQUIREMENTS=Task 2 from docs/superpowers/plans/deployment-plan.md]\", context: \"fresh\" })`\n\n[After /return, review output]:\n  Strengths: Clean architecture, real tests\n  Issues:\n    Important: Missing progress indicators\n    Minor: Magic number (100) for reporting interval\n  Assessment: Ready to proceed"
+```
+
+To:
+
+```
+"[Call push-task with review prompt]\n`push-task({ prompt: \"You are a Senior Code Reviewer... [review body from code-reviewer.md, filled with BASE_SHA=a7981ec, HEAD_SHA=3df7661, DESCRIPTION=Added verifyIndex() and repairIndex() with 4 issue types, PLAN_OR_REQUIREMENTS=Task 2 from docs/superpowers/plans/deployment-plan.md]\", context: \"fresh\" })`\n\n[After /finish-task, review output]:\n  Strengths: Clean architecture, real tests\n  Issues:\n    Important: Missing progress indicators\n    Minor: Magic number (100) for reporting interval\n  Assessment: Ready to proceed"
+```
 
 - [ ] **Step 4: Update `updater/skills/writing-skills.json`**
 
-In the SKILL.md file, three patches have conditionals:
+Three patches in SKILL.md need changes.
 
-Patch 1 (RED section): `find` contains `"### RED: Write Failing Test (Baseline)"`:
-- Delete `**If the \`push-task\` tool is available:**\n`
-- Delete the `**Otherwise:**` fallback (from `\n**Otherwise:**\nRun...` up to the end of the replace)
-- Change `/return` to `/finish-task`
+**Patch 1 (RED section):** Find where `find` contains `"### RED: Write Failing Test (Baseline)"`. Change `replace` from:
 
-Patch 2 (GREEN section): `find` contains `"Run same scenarios WITH skill"`:
-- Similar: remove conditional, change `/return` to `/finish-task`
+```
+"### RED: Write Failing Test (Baseline)\n\n**If the `push-task` tool is available:**\n1. Call `push-task({ prompt: <pressure scenario>, context: \"branch\" })`\n2. Tell the user: \"Run `/start-task` to run the baseline scenario.\"\n3. After `/return`, document the agent's choices and rationalizations verbatim.\n\n**Otherwise:**\nRun the scenario in the current session and document the agent's behavior:\n- What choices did they make?\n- What rationalizations did they use (verbatim)?\n- Which pressures triggered violations?"
+```
 
-Patch 3 (REFACTOR section): `find` contains `"### REFACTOR: Close Loopholes"`:
-- Similar: remove conditional, change `/return` to `/finish-task`
+To:
+
+```
+"### RED: Write Failing Test (Baseline)\n\n1. Call `push-task({ prompt: <pressure scenario>, context: \"branch\" })`\n2. Tell the user: \"Run `/start-task` to run the baseline scenario.\"\n3. After `/finish-task`, document the agent's choices and rationalizations verbatim."
+```
+
+**Patch 2 (GREEN section):** Find where `find` contains `"Run same scenarios WITH skill"`. Change `replace` from:
+
+```
+"Run same scenarios WITH skill. Agent should now comply.\n\n**If `push-task` is available:** Call `push-task({ prompt: \"<pressure scenario with skill loaded>\", context: \"branch\" })` and tell the user to run `/start-task`. After `/return`, confirm compliance.\n\n**Otherwise:** Run in the current session."
+```
+
+To:
+
+```
+"Run same scenarios WITH skill. Agent should now comply.\n\nCall `push-task({ prompt: \"<pressure scenario with skill loaded>\", context: \"branch\" })` and tell the user to run `/start-task`. After `/finish-task`, confirm compliance."
+```
+
+**Patch 3 (REFACTOR section):** Find where `find` contains `"### REFACTOR: Close Loopholes"`. Change `replace` from:
+
+```
+"### REFACTOR: Close Loopholes\n\n**If the `push-task` tool is available:**\n1. Call `push-task({ prompt: <updated scenario + updated skill loaded>, context: \"branch\" })`\n2. Tell the user: \"Run `/start-task` to verify the updated skill works.\"\n3. After `/return`, confirm the agent now complies and no new rationalizations appear.\n\n**Otherwise:**\nAgent found new rationalization? Add explicit counter. Re-test until bulletproof."
+```
+
+To:
+
+```
+"### REFACTOR: Close Loopholes\n\n1. Call `push-task({ prompt: <updated scenario + updated skill loaded>, context: \"branch\" })`\n2. Tell the user: \"Run `/start-task` to verify the updated skill works.\"\n3. After `/finish-task`, confirm the agent now complies and no new rationalizations appear."
+```
 
 - [ ] **Step 5: Run updater**
 
