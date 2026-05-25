@@ -154,6 +154,8 @@ The RED/GREEN/REFACTOR sections currently introduce explicit `push-task({ ... })
 
 ## Patch Strategy
 
+Implementation should primarily modify `updater/skills/*.json` definitions, then run the updater to regenerate `skills/`. Generated files under `skills/` are outputs to inspect, not the main source of truth.
+
 Implementation should prefer the smallest patch that changes the right upstream sentence:
 
 1. Find the upstream sentence or paragraph that discusses inline self-review, Task tool usage, or subagent dispatch.
@@ -184,13 +186,17 @@ After implementation:
    - `skills/requesting-code-review/code-reviewer.md`
    to confirm they are minimal and still justified
 
-Recommended grep checks:
+Recommended grep checks against the four main `SKILL.md` files only:
 
 ```bash
-rg -n 'Run `/start-task`|/finish-task|branch summary' skills/brainstorming skills/writing-plans skills/requesting-code-review skills/writing-skills
+rg -n 'Run `/start-task`|/finish-task|branch summary' \
+  skills/brainstorming/SKILL.md \
+  skills/writing-plans/SKILL.md \
+  skills/requesting-code-review/SKILL.md \
+  skills/writing-skills/SKILL.md
 ```
 
-Expected result after regeneration: no matches in the four main `SKILL.md` files for these obsolete or redundant phrasings.
+Expected result after regeneration: no matches in those four `SKILL.md` files for these obsolete or redundant phrasings.
 
 ## Risks and Mitigations
 
