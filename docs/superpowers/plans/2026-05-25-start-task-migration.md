@@ -230,14 +230,21 @@ npm run updater
 ```
 Expected: Exit 0 (no patch failures — drift detection passes)
 
-- [ ] **Step 2: Verify no stale `/start-fresh` references**
+- [ ] **Step 2: Confirm only expected files changed**
+
+```bash
+git diff --stat skills/
+```
+Expected: Only the four target SKILL.md files listed. No unexpected changes.
+
+- [ ] **Step 3: Verify no stale `/start-fresh` references**
 
 ```bash
 grep -n "start-fresh" skills/brainstorming/SKILL.md skills/writing-plans/SKILL.md skills/requesting-code-review/SKILL.md skills/writing-skills/SKILL.md
 ```
 Expected: No output (empty — all references migrated)
 
-- [ ] **Step 3: Verify new references exist**
+- [ ] **Step 4: Verify new references exist**
 
 ```bash
 grep -c "start-task" skills/brainstorming/SKILL.md skills/writing-plans/SKILL.md skills/requesting-code-review/SKILL.md skills/writing-skills/SKILL.md
@@ -248,25 +255,25 @@ Expected (minimum counts):
 - requesting-code-review: 1
 - writing-skills: 3
 
-- [ ] **Step 4: Verify context parameters exist**
+- [ ] **Step 5: Verify context parameters exist**
 
 ```bash
 grep -c 'context.*fresh\|context.*branch' skills/brainstorming/SKILL.md skills/writing-plans/SKILL.md skills/requesting-code-review/SKILL.md skills/writing-skills/SKILL.md
 ```
-Expected (minimum `context: "fresh"` or `context: "branch"` counts):
+Expected (exact `context: "fresh"` or `context: "branch"` counts):
 - brainstorming: 1
 - writing-plans: 1
-- requesting-code-review: 1
+- requesting-code-review: 2 (instructions patch + example patch)
 - writing-skills: 3
 
-- [ ] **Step 5: Full verification gate**
+- [ ] **Step 6: Full verification gate**
 
 ```bash
 npm run verify
 ```
 Expected: All checks pass (lint → tsc → test → updater → skill drift → pack)
 
-- [ ] **Step 6: Commit generated skills**
+- [ ] **Step 7: Commit generated skills**
 
 ```bash
 git add skills/
