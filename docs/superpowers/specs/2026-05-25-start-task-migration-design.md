@@ -20,6 +20,13 @@ pi-navigator recently added:
 
 Update four skills that already use `push-task` + `/start-fresh`:
 
+| Skill | File |
+|---|---|
+| brainstorming | `skills/brainstorming/SKILL.md` |
+| writing-plans | `skills/writing-plans/SKILL.md` |
+| requesting-code-review | `skills/requesting-code-review/SKILL.md` |
+| writing-skills | `skills/writing-skills/SKILL.md` |
+
 | Skill | Context | Push-task calls |
 |---|---|---|
 | brainstorming | `fresh` | 1 |
@@ -67,7 +74,7 @@ All three push-task calls (RED baseline, GREEN with-skill, REFACTOR verification
 
 ### Additional: requesting-code-review example
 
-The example `push-task` call in the narrative body (line ~59) gets the same treatment.
+The example `push-task` call in the narrative body (the line starting `push-task({ prompt: "You are a Senior Code Reviewer...`) gets the same treatment: add `context: "fresh"` and update surrounding user instruction from `/start-fresh` to `/start-task`.
 
 ## Design Principles
 
@@ -76,3 +83,13 @@ The example `push-task` call in the narrative body (line ~59) gets the same trea
 3. **Self-contained prompts** — unchanged. Prompts passed to `push-task` must be fully self-contained. This is already true; no prompt content changes.
 4. **`context` explicit** — always include the `context` parameter for clarity, even when it matches the default (`"fresh"`).
 5. **Verbatim results** — note that `/start-task` returns the last assistant message verbatim (not summarized), which is a benefit for review tasks.
+
+## Verification
+
+After implementation, confirm no stale `/start-fresh` references remain in the four affected skill files:
+
+```bash
+grep -n "start-fresh" skills/brainstorming/SKILL.md skills/writing-plans/SKILL.md skills/requesting-code-review/SKILL.md skills/writing-skills/SKILL.md
+```
+
+Expected: no output. Any match means a reference was missed.
