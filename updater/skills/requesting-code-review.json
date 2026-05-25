@@ -37,7 +37,7 @@
         {
           "op": "replace",
           "find": "Use this template when dispatching a code reviewer subagent.",
-          "replace": "Use this template as the prompt argument to `push-task` when requesting a fresh-context code review."
+          "replace": "Use this template when dispatching a code reviewer task."
         },
         {
           "op": "replace",

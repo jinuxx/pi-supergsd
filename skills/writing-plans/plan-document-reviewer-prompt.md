@@ -1,6 +1,6 @@
 # Plan Document Reviewer Prompt Template
 
-Use this template as the prompt argument to `push-task` when requesting a fresh-context plan review.
+Use this template when dispatching a plan document reviewer task.
 
 **Purpose:** Verify the plan is complete, matches the spec, and has proper task decomposition.
 

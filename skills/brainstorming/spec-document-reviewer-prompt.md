@@ -1,6 +1,6 @@
 # Spec Document Reviewer Prompt Template
 
-Use this template as the prompt argument to `push-task` when requesting a fresh-context spec review.
+Use this template when dispatching a spec document reviewer task.
 
 **Purpose:** Verify the spec is complete, consistent, and ready for implementation planning.
 

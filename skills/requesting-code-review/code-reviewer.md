@@ -1,6 +1,6 @@
 # Code Reviewer Prompt Template
 
-Use this template as the prompt argument to `push-task` when requesting a fresh-context code review.
+Use this template when dispatching a code reviewer task.
 
 **Purpose:** Review completed work against requirements and code quality standards before it cascades into more work.
 

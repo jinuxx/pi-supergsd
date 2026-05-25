@@ -11,7 +11,7 @@ description: Use when creating new skills, editing existing skills, or verifying
 
 **Personal skills live in agent-specific directories (`~/.pi/skills` for Pi, `~/.agents/skills/` for Codex)** 
 
-You write test cases (pressure scenarios with push-task), watch them fail (baseline behavior), write the skill (documentation), watch tests pass (agents comply), and refactor (close loopholes).
+You write test cases (pressure scenarios with fresh context), watch them fail (baseline behavior), write the skill (documentation), watch tests pass (agents comply), and refactor (close loopholes).
 
 **Core principle:** If you didn't watch an agent fail without the skill, you don't know if the skill teaches the right thing.
 
@@ -237,7 +237,7 @@ When searching, dispatch subagent with template...
 [20 lines of repeated instructions]
 
 # ✅ GOOD: Reference other skill
-Use push-task for fresh-context work (50-100x context savings). REQUIRED: Use [other-skill-name] for workflow.
+Use fresh-context work (50-100x context savings). REQUIRED: Use [other-skill-name] for workflow.
 ```
 
 **Compress examples:**
@@ -250,7 +250,7 @@ You: I'll search past conversations for React Router authentication patterns.
 # ✅ GOOD: Minimal example (20 words)
 Partner: "How did we handle auth errors in React Router?"
 You: Searching...
-[push-task → synthesis]
+[Fresh context → synthesis]
 ```
 
 **Eliminate redundancy:**
