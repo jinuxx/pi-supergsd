@@ -72,6 +72,15 @@ After `/return`, document the agent's choices...
 
 All three push-task calls (RED baseline, GREEN with-skill, REFACTOR verification) use `context: "branch"` so the agent retains memory of the skill it just wrote and the design decisions behind it.
 
+### requesting-code-review: "branch summary" → verbatim language
+
+The file uses "branch summary" in two places that should reflect verbatim results:
+
+- **Line 37:** "read the branch summary and act on feedback" → "read the review output and act on feedback"
+- **Line 61 (example):** `[After /return, branch summary contains]:` → `[After /return, review output]:`
+
+With `/start-task`, the handoff mode is `last-response`, so the review comes back verbatim — not summarized.
+
 ### Additional: requesting-code-review example
 
 The example `push-task` call in the narrative body (the line starting `push-task({ prompt: "You are a Senior Code Reviewer...`) gets the same treatment: add `context: "fresh"` and update surrounding user instruction from `/start-fresh` to `/start-task`.
