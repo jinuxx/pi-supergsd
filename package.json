@@ -1,6 +1,6 @@
 {
   "name": "pi-supergsd",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "Curated, patched Superpowers skills packaged for Pi",
   "type": "module",
   "scripts": {
@@ -40,8 +40,8 @@
     ]
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "typebox": "*"
+    "@earendil-works/pi-coding-agent": "^0.75.5",
+    "typebox": "^1.1.38"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
@@ -50,9 +50,5 @@
     "tsx": "^4.0.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.4"
-  },
-  "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.75.5",
-    "typebox": "^1.1.38"
   }
 }

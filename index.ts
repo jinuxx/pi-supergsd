@@ -45,7 +45,7 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
 
 export function createStartTaskCommand(pi: ExtensionAPI): CommandOptions {
   return {
-    description: 'Start the active task as a subagent',
+    description: 'Navigate to a fresh context and inject the active task prompt',
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
 

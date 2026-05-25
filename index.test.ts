@@ -383,7 +383,7 @@ describe('registration', () => {
 
     assert.deepStrictEqual(registered, [
       { type: 'tool', name: 'push-task', description: 'Store a task prompt for a user-started navigation branch.' },
-      { type: 'command', name: 'start-task', description: 'Start the active task as a subagent' },
+      { type: 'command', name: 'start-task', description: 'Navigate to a fresh context and inject the active task prompt' },
       { type: 'command', name: 'discard-task', description: 'Discard the active task without executing it' },
       { type: 'command', name: 'finish-task', description: 'Finish the current task and return to the task start point' },
       { type: 'command', name: 'abort-task', description: 'Abort the current task without finishing' },
