@@ -16,7 +16,7 @@ TASK_ENTRY_TYPE = 'task'
 TASK_DONE_ENTRY_TYPE = 'task-done'
 TASK_START_ENTRY_TYPE = 'task-start'    // renamed from 'checkpoint' to avoid collision
 TaskData { prompt, context }
-TaskStartData { returnTo, handoff }
+TaskStartData { returnTo }              // no handoff field — always last-response
 ReadonlySessionLike (minimal session interface)
 
 // ── Lookup utilities ──
@@ -32,17 +32,19 @@ isAssistantMessageEntry(entry)
 createPushTaskTool(pi) → stores TASK_ENTRY_TYPE entry
 
 // ── Commands ──
-createStartTaskCommand(pi)     → finds active task, creates task-start checkpoint,
+createStartTaskCommand(pi)     → finds active task, creates task-start entry,
                                   injects prompt, fresh/branch navigation
 createDiscardTaskCommand(pi)   → appends TASK_DONE, consumes task
-createFinishTaskCommand(pi)    → navigates to task-start checkpoint (summary or
-                                  last-response handoff), appends TASK_DONE
-createAbortTaskCommand(pi)     → navigates to task-start checkpoint (no summary),
+createFinishTaskCommand(pi)    → navigates to task-start, injects last assistant
+                                  message verbatim, appends TASK_DONE
+createAbortTaskCommand(pi)     → navigates to task-start (no injection),
                                   appends TASK_DONE
 
 // ── Registration ──
 export default function register(pi) → 1 tool + 4 commands
 ```
+
+`/finish-task` always injects the last assistant message — no summary mode, no handoff field, no `/finish-task last` override. When there's no assistant message on the branch, it notifies and returns with no injection.
 
 Commands: `/start-task`, `/discard-task`, `/finish-task`, `/abort-task`
 

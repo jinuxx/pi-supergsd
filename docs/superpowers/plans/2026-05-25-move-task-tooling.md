@@ -4,7 +4,7 @@
 
 **Goal:** Move `push-task`, `/start-task`, `/discard-task` and add `/finish-task`, `/abort-task` from pi-navigator into pi-supergsd, making task workflow self-contained.
 
-**Architecture:** pi-supergsd gains a flat `index.ts` + `index.test.ts` following pi-navigator's pattern. Task-specific code is ported with renames (`checkpoint` → `task-start`, `/return` → `/finish-task`, `/cancel` → `/abort-task`). pi-navigator drops all task code and task consumption from `/return`/`/cancel`. Skill patches drop `push-task` conditionals. No shared dependency — entry type strings (`'task-start'` vs `'checkpoint'`) are the only implicit contract.
+**Architecture:** pi-supergsd gains a flat `index.ts` + `index.test.ts` following pi-navigator's pattern. Task-specific code is ported with renames (`checkpoint` → `task-start`, `/return` → `/finish-task`, `/cancel` → `/abort-task`). Handoff is simplified: no `handoff` field — `/finish-task` always injects the last assistant message verbatim (no summary mode). pi-navigator drops all task code and task consumption from `/return`/`/cancel`. Skill patches drop `push-task` conditionals. No shared dependency — entry type strings (`'task-start'` vs `'checkpoint'`) are the only implicit contract.
 
 **Tech Stack:** TypeScript (ES modules, Node 20+), Pi SDK (`@earendil-works/pi-coding-agent`), TypeBox, Node built-in test runner, tsx
 
@@ -359,10 +359,10 @@ export function createStartTaskCommand(pi: ExtensionAPI): CommandOptions {
         const result = await ctx.navigateTree(freshTargetId, { summarize: false });
         if (result.cancelled) return;
 
-        pi.appendEntry(TASK_START_ENTRY_TYPE, { returnTo: departureLeafId, handoff: 'last-response' });
+        pi.appendEntry(TASK_START_ENTRY_TYPE, { returnTo: departureLeafId });
       } else {
         // Branch context — same as /start-branch
-        pi.appendEntry(TASK_START_ENTRY_TYPE, { returnTo: ctx.sessionManager.getLeafId()!, handoff: 'last-response' });
+        pi.appendEntry(TASK_START_ENTRY_TYPE, { returnTo: ctx.sessionManager.getLeafId()! });
       }
 
       pi.sendUserMessage(activeTask.data.prompt);
@@ -392,7 +392,7 @@ export function createDiscardTaskCommand(pi: ExtensionAPI): CommandOptions {
 export function createFinishTaskCommand(pi: ExtensionAPI): CommandOptions {
   return {
     description: 'Finish the current task and return to the task start point',
-    handler: async (args: string, ctx: ExtensionCommandContext) => {
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
 
       const taskStart = findTaskStart(ctx.sessionManager);
@@ -401,48 +401,37 @@ export function createFinishTaskCommand(pi: ExtensionAPI): CommandOptions {
         return;
       }
 
-      // Parse override from args
-      let handoff = taskStart.data.handoff ?? 'summary';
-      const trimmed = args.trim();
-      if (trimmed === 'last' || trimmed === 'last-response') {
-        handoff = 'last-response';
-      } else if (trimmed === 'summary') {
-        handoff = 'summary';
-      }
-
-      // Capture last assistant message content before navigation (for last-response mode)
+      // Capture last assistant message content before navigation
       let lastAssistantContent: unknown;
       let lastAssistantId: string | undefined;
-      if (handoff === 'last-response') {
-        const branch = ctx.sessionManager.getBranch();
-        for (let i = branch.length - 1; i >= 0; i--) {
-          const entry = branch[i];
-          if (isAssistantMessageEntry(entry)) {
-            const rawContent = entry.message.content;
-            // Filter to only text blocks — thinking and toolCall blocks are not
-            // valid for custom_message content and cause provider errors (e.g.,
-            // DeepSeek rejects unrecognized content block variants).
-            if (Array.isArray(rawContent)) {
-              lastAssistantContent = rawContent.filter(
-                (block): block is { type: 'text'; text: string } =>
-                  typeof block === 'object' && block !== null && 'type' in block && block.type === 'text',
-              );
-            } else {
-              lastAssistantContent = rawContent;
-            }
-            lastAssistantId = entry.id;
-            break;
+      const branch = ctx.sessionManager.getBranch();
+      for (let i = branch.length - 1; i >= 0; i--) {
+        const entry = branch[i];
+        if (isAssistantMessageEntry(entry)) {
+          const rawContent = entry.message.content;
+          // Filter to only text blocks — thinking and toolCall blocks are not
+          // valid for custom_message content and cause provider errors (e.g.,
+          // DeepSeek rejects unrecognized content block variants).
+          if (Array.isArray(rawContent)) {
+            lastAssistantContent = rawContent.filter(
+              (block): block is { type: 'text'; text: string } =>
+                typeof block === 'object' && block !== null && 'type' in block && block.type === 'text',
+            );
+          } else {
+            lastAssistantContent = rawContent;
           }
+          lastAssistantId = entry.id;
+          break;
         }
       }
 
       const result = await ctx.navigateTree(taskStart.data.returnTo, {
-        summarize: handoff === 'summary',
+        summarize: false,
       });
       if (result.cancelled) return;
 
       // Inject last assistant message after navigation
-      if (handoff === 'last-response' && lastAssistantId) {
+      if (lastAssistantId) {
         pi.sendMessage({
           customType: 'branch-result',
           // Content is filtered to only TextContent blocks (or original string)
@@ -456,8 +445,7 @@ export function createFinishTaskCommand(pi: ExtensionAPI): CommandOptions {
         pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
       }
 
-      const injected = handoff === 'last-response' && !!lastAssistantId;
-      const label = injected ? 'Last response attached.' : handoff === 'last-response' ? 'No last response to attach.' : 'Branch summary attached.';
+      const label = lastAssistantId ? 'Last response attached.' : 'No last response to attach.';
       ctx.ui.notify(`Task finished. ${label}`, 'info');
     },
   };
@@ -548,7 +536,6 @@ export const TASK_START_ENTRY_TYPE = 'task-start';
 
 export interface TaskStartData {
   returnTo: string;
-  handoff?: 'summary' | 'last-response';
 }
 
 /**
@@ -722,7 +709,7 @@ describe('createStartTaskCommand', () => {
     assertLastNotification(notifications, 'warning', 'No pending task. Use push-task first.');
   });
 
-  it('navigates to fresh context and injects task prompt with handoff "last-response"', async () => {
+  it('navigates to fresh context and injects task prompt', async () => {
     const { pi, ctx, sentMessages, navigations } = makeHarness();
 
     const rootUserMsgId = ctx.sessionManager.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
@@ -737,13 +724,13 @@ describe('createStartTaskCommand', () => {
     assert.strictEqual(navigations[0].targetId, rootUserMsgId);
     assert.strictEqual((navigations[0].opts as { summarize?: boolean })?.summarize, false);
 
-    const taskStart = assertTaskStart(ctx.sessionManager, 'last-response');
+    const taskStart = assertTaskStart(ctx.sessionManager);
     assert.strictEqual(taskStart.returnTo, departureLeafId);
 
     assert.deepStrictEqual(sentMessages, ['Review spec for issues.']);
   });
 
-  it('stays on branch and creates task start with handoff "last-response"', async () => {
+  it('stays on branch and creates task start', async () => {
     const { pi, ctx, sentMessages, navigations } = makeHarness();
 
     ctx.sessionManager.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
@@ -755,7 +742,7 @@ describe('createStartTaskCommand', () => {
 
     assert.strictEqual(navigations.length, 0);
 
-    const taskStart = assertTaskStart(ctx.sessionManager, 'last-response');
+    const taskStart = assertTaskStart(ctx.sessionManager);
     assert.strictEqual(taskStart.returnTo, leafBefore);
 
     assert.deepStrictEqual(sentMessages, ['Quick fix.']);
@@ -771,7 +758,7 @@ describe('createStartTaskCommand', () => {
     await cmd.handler('', ctx);
 
     assert.strictEqual(navigations.length, 1);
-    const taskStart = assertTaskStart(ctx.sessionManager, 'last-response');
+    const taskStart = assertTaskStart(ctx.sessionManager);
     assert.ok(taskStart);
   });
 });
@@ -847,7 +834,7 @@ describe('createFinishTaskCommand', () => {
 
     assert.strictEqual(navigations.length, 1);
     assert.strictEqual(navigations[0].targetId, leafId);
-    assert.strictEqual((navigations[0].opts as { summarize?: boolean })?.summarize, true);
+    assert.strictEqual((navigations[0].opts as { summarize?: boolean })?.summarize, false);
 
     const entries = ctx.sessionManager.getEntries();
     const lastEntry = entries[entries.length - 1];
@@ -897,7 +884,7 @@ describe('createFinishTaskCommand', () => {
     assertNoActiveTask(ctx.sessionManager);
   });
 
-  it('injects last assistant message when task start has handoff "last-response"', async () => {
+  it('injects last assistant message', async () => {
     const { pi, ctx, sm, sentCustomMessages, notifications } = makeHarness();
 
     sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
@@ -905,7 +892,7 @@ describe('createFinishTaskCommand', () => {
 
     const leafId = sm.getLeafId()!;
     sm.branch(leafId);
-    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo: leafId, handoff: 'last-response' });
+    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo: leafId });
     sm.appendMessage({ role: 'user', content: 'work', timestamp: 0 });
     sm.appendMessage(assistantMessage('Working on it...'));
 
@@ -917,43 +904,6 @@ describe('createFinishTaskCommand', () => {
     assert.strictEqual((sentCustomMessages[0].options as { triggerTurn?: boolean } | undefined)?.triggerTurn, true);
 
     assertLastNotification(notifications, 'info', 'Task finished. Last response attached.');
-  });
-
-  it('overrides task start handoff with "/finish-task last"', async () => {
-    const { pi, ctx, sm, sentCustomMessages } = makeHarness();
-
-    sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
-    sm.appendMessage(assistantMessage('Summary of work...'));
-    const leafId = sm.getLeafId()!;
-    sm.branch(leafId);
-    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo: leafId, handoff: 'summary' });
-    sm.appendMessage({ role: 'user', content: 'work', timestamp: 0 });
-    sm.appendMessage(assistantMessage('Final answer.'));
-
-    const cmd = createFinishTaskCommand(pi);
-    await cmd.handler('last', ctx);
-
-    assert.strictEqual(sentCustomMessages.length, 1);
-    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
-  });
-
-  it('overrides task start handoff with "/finish-task summary"', async () => {
-    const { pi, ctx, sm, sentCustomMessages, navigations } = makeHarness();
-
-    sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
-    const leafId = sm.getLeafId()!;
-    sm.branch(leafId);
-    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo: leafId, handoff: 'last-response' });
-    sm.appendMessage({ role: 'user', content: 'work', timestamp: 0 });
-    sm.appendMessage(assistantMessage('Final answer.'));
-
-    const cmd = createFinishTaskCommand(pi);
-    await cmd.handler('summary', ctx);
-
-    assert.strictEqual(navigations.length, 1);
-    assert.strictEqual((navigations[0].opts as { summarize?: boolean })?.summarize, true);
-
-    assert.strictEqual(sentCustomMessages.length, 0);
   });
 
   it('filters out thinking blocks from injected last-response content', async () => {
@@ -973,7 +923,7 @@ describe('createFinishTaskCommand', () => {
 
     const leafId = sm.getLeafId()!;
     sm.branch(leafId);
-    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo: leafId, handoff: 'last-response' });
+    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo: leafId });
     sm.appendMessage({ role: 'user', content: 'task work', timestamp: 0 });
     sm.appendMessage({
       role: 'assistant',
@@ -1002,7 +952,7 @@ describe('createFinishTaskCommand', () => {
     sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
     const leafId = sm.getLeafId()!;
     sm.branch(leafId);
-    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo: leafId, handoff: 'last-response' });
+    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo: leafId });
 
     const cmd = createFinishTaskCommand(pi);
     await cmd.handler('', ctx);
@@ -1244,12 +1194,9 @@ type AppendMessageInput = Parameters<SessionManager['appendMessage']>[0];
 
 // ── Assertion helpers ────────────────────────────────────────────
 
-function assertTaskStart(sm: SessionManager, expectedHandoff?: TaskStartData['handoff']): TaskStartData {
+function assertTaskStart(sm: SessionManager): TaskStartData {
   const ts = getTaskStart(sm);
   assert.ok(ts, 'Expected task start, found none.');
-  if (expectedHandoff) {
-    assert.strictEqual(ts.handoff, expectedHandoff);
-  }
   return ts;
 }
 
