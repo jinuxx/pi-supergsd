@@ -51,7 +51,7 @@
         {
           "op": "replace",
           "find": "## Self-Review\n\nAfter writing the complete plan, look at the spec with fresh eyes and check the plan against it. This is a checklist you run yourself — not a subagent dispatch.",
-          "replace": "## Self-Review\n\n**Fresh-context plan review (optional but recommended):**\n\n1. Call `push-task({ prompt: \"<content from plan-document-reviewer-prompt.md>\", context: \"fresh\" })`\n2. Tell the user: \"Run `/start-task` for a fresh-context review of the plan.\"\n3. After `/finish-task`, fix any gaps before committing the plan."
+          "replace": "## Self-Review\n\nAfter writing the complete plan, use the `push-task` tool with `plan-document-reviewer-prompt.md` to request a fresh-context plan review. Act on the returned task result when you get it, then check the plan against the spec."
         }
       ]
     },
@@ -60,8 +60,8 @@
       "patches": [
         {
           "op": "replace",
-          "find": "# Plan Document Reviewer Prompt Template\n\nUse this template when dispatching a plan document reviewer subagent.\n\n**Purpose:** Verify the plan is complete, matches the spec, and has proper task decomposition.\n\n**Dispatch after:** The complete plan is written.\n\n```\nTask tool (general-purpose):\n  description: \"Review plan document\"\n  prompt: |",
-          "replace": "# Fresh-Context Plan Review Prompt Template\n\nUse this template as the prompt argument to `push-task` when requesting a fresh-context plan review."
+          "find": "Use this template when dispatching a plan document reviewer subagent.\n\n**Purpose:** Verify the plan is complete, matches the spec, and has proper task decomposition.\n\n**Dispatch after:** The complete plan is written.\n\n```\nTask tool (general-purpose):\n  description: \"Review plan document\"\n  prompt: |",
+          "replace": "Use this template as the prompt argument to `push-task` when requesting a fresh-context plan review."
         },
         {
           "op": "delete-line",

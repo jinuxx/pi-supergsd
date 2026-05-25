@@ -1,4 +1,4 @@
-# Fresh-Context Code Review Prompt Template
+# Code Reviewer Prompt Template
 
 Use this template as the prompt argument to `push-task` when requesting a fresh-context code review.
 You are a Senior Code Reviewer with expertise in software architecture,
@@ -113,6 +113,13 @@ For each issue:
 - Be vague ("improve error handling")
 - Avoid giving a clear verdict
 
+**Placeholders:**
+- `{DESCRIPTION}` — brief summary of what was built
+- `{PLAN_OR_REQUIREMENTS}` — what it should do (plan file path, task text, or requirements)
+- `{BASE_SHA}` — starting commit
+- `{HEAD_SHA}` — ending commit
+
+**Reviewer returns:** Strengths, Issues (Critical / Important / Minor), Recommendations, Assessment
 
 ## Example Output
 

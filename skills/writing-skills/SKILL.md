@@ -536,9 +536,10 @@ Follow the TDD cycle:
 
 ### RED: Write Failing Test (Baseline)
 
-1. Call `push-task({ prompt: <pressure scenario>, context: "branch" })`
-2. Tell the user: "Run `/start-task` to run the baseline scenario."
-3. After `/finish-task`, document the agent's choices and rationalizations verbatim.
+Use the `push-task` tool to run the pressure scenario without the skill. Act on the returned task result when you get it. Document exact behavior:
+- What choices did they make?
+- What rationalizations did they use (verbatim)?
+- Which pressures triggered violations?
 
 This is "watch the test fail" - you must see what agents naturally do before writing the skill.
 
@@ -548,13 +549,11 @@ Write skill that addresses those specific rationalizations. Don't add extra cont
 
 Run same scenarios WITH skill. Agent should now comply.
 
-Call `push-task({ prompt: "<pressure scenario with skill loaded>", context: "branch" })` and tell the user to run `/start-task`. After `/finish-task`, confirm compliance.
+Use the `push-task` tool to run the same scenario with the skill loaded. Act on the returned task result when you get it, then confirm compliance.
 
 ### REFACTOR: Close Loopholes
 
-1. Call `push-task({ prompt: <updated scenario + updated skill loaded>, context: "branch" })`
-2. Tell the user: "Run `/start-task` to verify the updated skill works."
-3. After `/finish-task`, confirm the agent now complies and no new rationalizations appear.
+Agent found a new rationalization? Add an explicit counter. Use the `push-task` tool to re-test with the updated scenario and skill, then act on the returned task result when you get it. Re-test until bulletproof.
 
 **Testing methodology:** See @testing-skills-with-subagents.md for the complete testing methodology (filename references a legacy term; content uses current navigator terminology):
 - How to write pressure scenarios

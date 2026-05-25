@@ -28,13 +28,6 @@ You MUST create a task for each of these items and complete them in order:
 5. **Present design** — in sections scaled to their complexity, get user approval after each section
 6. **Write design doc** — save to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` and commit
 7. **Spec self-review** — check the spec for completeness and consistency before user review
-
-1. Call `push-task({ prompt: "<content from spec-document-reviewer-prompt.md>", context: "fresh" })`
-   The prompt must be self-contained — it cannot reference "above" or prior
-   conversation, because `/start-task` provides empty context.
-2. Tell the user: "Run `/start-task` for a fresh-context review of the spec."
-3. After the user runs `/finish-task`, incorporate the review findings and fix any gaps
-   in the spec before proceeding to Step 8.
 8. **User reviews written spec** — ask user to review the spec file before proceeding
 9. **Transition to planning** — invoke /skill:writing-roadmaps for large/multi-phase designs, otherwise invoke /skill:writing-plans
 
@@ -122,7 +115,7 @@ digraph brainstorming {
 - Commit the design document to git
 
 **Spec Self-Review:**
-After writing the spec document, look at it with fresh eyes:
+After writing the spec document, use the `push-task` tool with `spec-document-reviewer-prompt.md` to request a fresh-context spec review. Act on the returned task result when you get it, then look at the spec with fresh eyes:
 
 1. **Placeholder scan:** Any "TBD", "TODO", incomplete sections, or vague requirements? Fix them.
 2. **Internal consistency:** Do any sections contradict each other? Does the architecture match the feature descriptions?

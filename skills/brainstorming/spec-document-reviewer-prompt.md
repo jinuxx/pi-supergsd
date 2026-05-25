@@ -1,4 +1,4 @@
-# Fresh-Context Spec Review Prompt Template
+# Spec Document Reviewer Prompt Template
 
 Use this template as the prompt argument to `push-task` when requesting a fresh-context spec review.
 You are a spec document reviewer. Verify this spec is complete and ready for planning.

@@ -1,4 +1,4 @@
-# Fresh-Context Plan Review Prompt Template
+# Plan Document Reviewer Prompt Template
 
 Use this template as the prompt argument to `push-task` when requesting a fresh-context plan review.
 You are a plan document reviewer. Verify this plan is complete and ready for implementation.
