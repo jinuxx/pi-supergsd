@@ -38,6 +38,8 @@ Update four skills that already use `push-task` + `/start-fresh`:
 
 ### Common pattern for fresh-context skills (brainstorming, writing-plans, requesting-code-review)
 
+The before/after blocks below illustrate the pattern. They are not literal find/replace scripts — the planner must locate exact text in each file.
+
 **Before:**
 ```
 Call `push-task({ prompt: "..." })`
@@ -81,9 +83,21 @@ The file uses "branch summary" in two places that should reflect verbatim result
 
 With `/start-task`, the handoff mode is `last-response`, so the review comes back verbatim — not summarized.
 
-### Additional: requesting-code-review example
+### requesting-code-review: example `push-task` call
 
-The example `push-task` call in the narrative body (the line starting `push-task({ prompt: "You are a Senior Code Reviewer...`) gets the same treatment: add `context: "fresh"` and update surrounding user instruction from `/start-fresh` to `/start-task`.
+The narrative example at the end of the requesting-code-review flow also needs updating:
+
+**Before:**
+```
+`push-task({ prompt: "You are a Senior Code Reviewer... [review body from code-reviewer.md, filled with BASE_SHA=a7981ec, HEAD_SHA=3df7661, DESCRIPTION=Added verifyIndex() and repairIndex() with 4 issue types, PLAN_OR_REQUIREMENTS=Task 2 from docs/superpowers/plans/deployment-plan.md]" })`
+```
+
+**After:**
+```
+`push-task({ prompt: "You are a Senior Code Reviewer... [review body from code-reviewer.md, filled with BASE_SHA=a7981ec, HEAD_SHA=3df7661, DESCRIPTION=Added verifyIndex() and repairIndex() with 4 issue types, PLAN_OR_REQUIREMENTS=Task 2 from docs/superpowers/plans/deployment-plan.md]", context: "fresh" })`
+```
+
+The surrounding prose (`[After /return, branch summary contains]:`) is already covered by the verbatim-language fix above.
 
 ## Design Principles
 
