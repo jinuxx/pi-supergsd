@@ -18,6 +18,20 @@ This extension implements a minimal task system that tries to respect these desi
 
 This extension also bundles a subset of [Superpowers](https://github.com/obra/superpowers) skills, patched for Pi conventions (`/skill:` instead of `superpowers:`, `Pi` instead of `Claude Code`, etc) and routed through the task system rather than dispatching subagents.
 
+## Tools and commands reference
+
+| Command | Action |
+|---|---|
+| `/start-task` | Saves a checkpoint and starts the pending task in a new branch |
+| `/finish-task` | Returns from task branch to saved checkpoint with the assistant response as a result |
+| `/abort-task` | Returns from task branch to saved checkpoint without attaching any result |
+| `/discard-task` | Discards a pending task without executing it |
+| `/auto` | Runs all pending tasks hands-free, including any queued during the run |
+
+### `push-task` tool
+
+Queues a task with `context` `"fresh"` (clean session) or `"branch"` (current branch). Defaults to `"fresh"`. The task sits pending — nothing runs until you start it.
+
 ## Use cases
 
 ### Review with in-branch fixes
@@ -89,20 +103,6 @@ LLM:     Implements CLI, adds tests. Let me queue a review.
 
 ... and so on until finished, blocked or interrupted by user.
 ```
-
-## Tools and commands reference
-
-| Command | Action |
-|---|---|
-| `/start-task` | Saves a checkpoint and starts the pending task in a new branch |
-| `/finish-task` | Returns from task branch to saved checkpoint with the assistant response as a result |
-| `/abort-task` | Returns from task branch to saved checkpoint without attaching any result |
-| `/discard-task` | Discards a pending task without executing it |
-| `/auto` | Runs all pending tasks hands-free, including any queued during the run |
-
-### `push-task` tool
-
-Queues a task with `context` `"fresh"` (clean session) or `"branch"` (current branch). Defaults to `"fresh"`. The task sits pending — nothing runs until you start it.
 
 ## Credits
 
