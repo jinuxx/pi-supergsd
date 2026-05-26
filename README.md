@@ -20,26 +20,75 @@ This extension also bundles a subset of [Superpowers](https://github.com/obra/su
 
 ## Use cases
 
-Skills that need a fresh-context review don't branch themselves - they queue the work and tell you to run it:
+### Review with in-branch fixes
+
+The LLM queues a review after implementation. You start it manually, fix issues right in the branch, then merge findings back.
 
 ```
-LLM:     Spec written. Let me queue a fresh-context review.
+LLM:     Implementation done. Let me queue a fresh review.
 
-LLM:     [calls push-task({ prompt: "Review docs/superpowers/specs/
-         feature-design.md for completeness, consistency, and scope.
-         Flag anything that needs clarification.", context: "fresh" })]
+LLM:     [calls push-task({ prompt: "Review the implementation
+         against the plan. Check correctness, edge cases,
+         and test coverage.", context: "fresh" })]
 
-LLM:     Task stored. Run /start-task or /auto.
+LLM:     Task stored. Run /start-task to review.
+
+You:     /start-task
+
+Pi:      [branches to fresh context, injects review prompt]
+
+LLM:     [reviews code] Two issues: parse() swallows the original
+         error, and the cache isn't invalidated on config changes.
+
+You:     I agree with cache invalidation issue, but error handling
+         in parse() was intentional. Adjust your report. 
+
+LLM:     [adjusts report]
+
+You:     /finish-task
+
+Pi:      [returns to main branch with report attached]
+
+LLM:     [reads report] Good catches. Let me fix them.
+```
+
+### Batch implementation with /auto
+
+You prepared a detailed multi-phase plan for implementing a feature, and run it hands-free.
+
+```
+LLM:     Roadmap has 3 phases. Let me queue phase 1.
+
+LLM:     [calls push-task with phase 1 plan]
 
 You:     /auto
 
-Pi:      [runs task in fresh context, returns with findings]
+Pi:      [branches to fresh context, injects phase 1 plan]
 
-LLM:     [reads findings] Good catches. Let me fix the error
-         handling section first.
+LLM:     Scaffolds project, writes core types. Let me do clean review.
+
+LLM:     [calls push-task with review prompt]
+
+Pi:      [branches to fresh context, injects review prompt]
+
+LLM:     [reviews code] No issues.
+
+Pi:      [returns to phase 1 implementation branch with report attached]
+
+LLM:     [reads report] No issues - good. Phase 1 done, ready for phase 2.
+
+Pi:      [returns to main branch, with report attached]
+
+LLM:     [reads report] Great! Let me queue phase 2.
+
+LLM:     [calls push-task with phase 2 plan]
+
+Pi:      [branches to fresh context, injects phase 2 plan]
+
+LLM:     Implements CLI, adds tests. Let me queue a review.
+
+... and so on until finished, blocked or interrupted by user.
 ```
-
-This keeps your main context clean and gives the reviewer fresh eyes.
 
 ## Tools and commands reference
 
