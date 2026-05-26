@@ -25,7 +25,8 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
     description: 'Store a task prompt for a user-started navigation branch.',
     promptSnippet: 'Store a focused task prompt for a user-started navigation branch.',
     promptGuidelines: [
-      'Use push-task when a skill needs the user to start a focused branch workflow with /start-task.',
+      'Use push-task when a skill needs the user to start a focused branch workflow with /start-task or /auto.',
+      'Use push-task by itself when the intent is to hand control to /auto, because terminate:true only takes effect when every tool in the batch also terminates.',
     ],
     parameters: pushTaskParameters,
     async execute(_toolCallId, params, signal) {
@@ -36,8 +37,9 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
       pi.appendEntry(TASK_ENTRY_TYPE, { prompt: params.prompt, context: params.context ?? 'fresh' });
 
       return {
-        content: [{ type: 'text', text: 'Task stored. Run `/start-task` to begin.' }],
+        content: [{ type: 'text', text: 'Task stored. Use `/start-task` or `/auto` to start it.' }],
         details: {},
+        terminate: true,
       };
     },
   });
@@ -49,7 +51,7 @@ export function createStartTaskCommand(pi: ExtensionAPI): CommandOptions {
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
 
-      const activeTask = findActiveTask(ctx.sessionManager);
+      const activeTask = pendingTask(ctx.sessionManager);
       if (!activeTask) {
         ctx.ui.notify('No pending task. Use push-task first.', 'warning');
         return;
@@ -85,7 +87,7 @@ export function createDiscardTaskCommand(pi: ExtensionAPI): CommandOptions {
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
 
-      const activeTask = findActiveTask(ctx.sessionManager);
+      const activeTask = pendingTask(ctx.sessionManager);
       if (!activeTask) {
         ctx.ui.notify('No pending task.', 'warning');
         return;
@@ -104,7 +106,7 @@ export function createFinishTaskCommand(pi: ExtensionAPI): CommandOptions {
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
 
-      const taskStart = findTaskStart(ctx.sessionManager);
+      const taskStart = currentTask(ctx.sessionManager);
       if (!taskStart) {
         ctx.ui.notify('No task start point.', 'warning');
         return;
@@ -150,7 +152,7 @@ export function createFinishTaskCommand(pi: ExtensionAPI): CommandOptions {
         }, { triggerTurn: true });
       }
 
-      if (findActiveTask(ctx.sessionManager)) {
+      if (pendingTask(ctx.sessionManager)) {
         pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
       }
 
@@ -166,7 +168,7 @@ export function createAbortTaskCommand(pi: ExtensionAPI): CommandOptions {
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
 
-      const taskStart = findTaskStart(ctx.sessionManager);
+      const taskStart = currentTask(ctx.sessionManager);
 
       if (!taskStart) {
         ctx.ui.notify('No task start point.', 'warning');
@@ -176,7 +178,7 @@ export function createAbortTaskCommand(pi: ExtensionAPI): CommandOptions {
       const result = await ctx.navigateTree(taskStart.data.returnTo, { summarize: false });
       if (result.cancelled) return;
 
-      if (findActiveTask(ctx.sessionManager)) {
+      if (pendingTask(ctx.sessionManager)) {
         pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
       }
 
@@ -192,23 +194,25 @@ function isAssistantMessageEntry(entry: SessionEntry): entry is SessionMessageEn
 
 // ── Lookup utilities ──────────────────────────────────────────────
 
-export function findActiveTask(
+export function pendingTask(
   session: ReadonlySessionLike,
 ): (SessionEntry & { data: TaskData }) | null {
-  const entries = session.getEntries();
-  const byId = new Map<string, SessionEntry>(entries.map((e) => [e.id, e]));
+  const branch = session.getBranch();
   let skip = 0;
-  const leafId = session.getLeafId();
-  let current = leafId ? byId.get(leafId) : undefined;
 
-  while (current) {
-    if (current.type === 'custom' && current.customType === TASK_DONE_ENTRY_TYPE) {
+  for (let i = branch.length - 1; i >= 0; i--) {
+    const entry = branch[i];
+    if (entry.type === 'custom' && entry.customType === TASK_START_ENTRY_TYPE) {
+      return null;
+    }
+    if (entry.type === 'custom' && entry.customType === TASK_DONE_ENTRY_TYPE) {
       skip++;
-    } else if (current.type === 'custom' && current.customType === TASK_ENTRY_TYPE) {
-      if (skip === 0) return current as SessionEntry & { data: TaskData };
+      continue;
+    }
+    if (entry.type === 'custom' && entry.customType === TASK_ENTRY_TYPE) {
+      if (skip === 0) return entry as SessionEntry & { data: TaskData };
       skip--;
     }
-    current = current.parentId ? byId.get(current.parentId) : undefined;
   }
 
   return null;
@@ -223,19 +227,16 @@ export interface TaskData {
   context: 'fresh' | 'branch';
 }
 
-export function findTaskStart(
+export function currentTask(
   session: ReadonlySessionLike,
 ): (SessionEntry & { data: TaskStartData }) | null {
-  const entries = session.getEntries();
-  const byId = new Map<string, SessionEntry>(entries.map((e) => [e.id, e]));
-  const leafId = session.getLeafId();
-  let current = leafId ? byId.get(leafId) : undefined;
+  const branch = session.getBranch();
 
-  while (current) {
-    if (current.type === 'custom' && current.customType === TASK_START_ENTRY_TYPE) {
-      return current as SessionEntry & { data: TaskStartData };
+  for (let i = branch.length - 1; i >= 0; i--) {
+    const entry = branch[i];
+    if (entry.type === 'custom' && entry.customType === TASK_START_ENTRY_TYPE) {
+      return entry as SessionEntry & { data: TaskStartData };
     }
-    current = current.parentId ? byId.get(current.parentId) : undefined;
   }
 
   return null;

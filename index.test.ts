@@ -10,6 +10,8 @@ import registerTaskCommands, {
   createFinishTaskCommand,
   createAbortTaskCommand,
   createDiscardTaskCommand,
+  pendingTask,
+  currentTask,
 } from './index.js';
 
 import {
@@ -21,29 +23,17 @@ import {
 } from './index.js';
 
 describe('createPushTaskTool', () => {
-  it('pushes a task entry, and returns instruction text', async () => {
+  it('returns terminate=true with the /auto-aware instruction text', async () => {
     const { pi, ctx, sm } = makeHarness();
     sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
 
     const tool = createPushTaskTool(pi);
-    assert.strictEqual(tool.name, 'push-task');
-    await tool.execute('call-1', { prompt: 'Review the spec.' }, undefined, undefined, ctx);
+    const result = await tool.execute('call-1', { prompt: 'Review the spec.' }, undefined, undefined, ctx);
 
-    const task = assertActiveTask(ctx.sessionManager);
-    assert.strictEqual(task.prompt, 'Review the spec.');
-    assert.strictEqual(task.context, 'fresh');
-  });
-
-  it('pushes a task entry with explicit context "branch"', async () => {
-    const { pi, ctx, sm } = makeHarness();
-    sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
-
-    const tool = createPushTaskTool(pi);
-    await tool.execute('call-1', { prompt: 'Quick fix.', context: 'branch' }, undefined, undefined, ctx);
-
-    const task = assertActiveTask(ctx.sessionManager);
-    assert.strictEqual(task.prompt, 'Quick fix.');
-    assert.strictEqual(task.context, 'branch');
+    assert.strictEqual(result.terminate, true);
+    assert.deepStrictEqual(result.content, [
+      { type: 'text', text: 'Task stored. Use `/start-task` or `/auto` to start it.' },
+    ]);
   });
 });
 
@@ -365,6 +355,50 @@ describe('createAbortTaskCommand', () => {
     await cmd.handler('', ctx);
 
     assert.strictEqual(ctx.sessionManager.getEntries().length, entriesBefore);
+  });
+});
+
+describe('pendingTask', () => {
+  it('returns null once a task-start exists on the current branch', () => {
+    const { sm } = makeHarness();
+
+    sm.appendMessage({ role: 'user', content: 'root', timestamp: 0 });
+    sm.appendCustomEntry(TASK_ENTRY_TYPE, { prompt: 'Branch task', context: 'branch' });
+    const returnTo = sm.getLeafId()!;
+    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo });
+    sm.appendMessage({ role: 'user', content: 'task work', timestamp: 0 });
+
+    assert.strictEqual(pendingTask(sm), null);
+  });
+
+  it('ignores task entries on sibling forks', () => {
+    const { sm } = makeHarness();
+
+    sm.appendMessage({ role: 'user', content: 'root', timestamp: 0 });
+    const rootId = sm.getLeafId()!;
+
+    sm.branch(rootId);
+    sm.appendCustomEntry(TASK_ENTRY_TYPE, { prompt: 'Sibling task', context: 'branch' });
+
+    sm.branch(rootId);
+    sm.appendMessage({ role: 'user', content: 'active branch', timestamp: 0 });
+
+    assert.strictEqual(pendingTask(sm), null);
+    assert.strictEqual(currentTask(sm), null);
+  });
+});
+
+describe('currentTask', () => {
+  it('returns the task-start on the active branch', () => {
+    const { sm } = makeHarness();
+
+    sm.appendMessage({ role: 'user', content: 'root', timestamp: 0 });
+    const returnTo = sm.getLeafId()!;
+    sm.appendCustomEntry(TASK_START_ENTRY_TYPE, { returnTo });
+
+    const taskStart = currentTask(sm);
+    assert.ok(taskStart);
+    assert.strictEqual(taskStart.data.returnTo, returnTo);
   });
 });
 
