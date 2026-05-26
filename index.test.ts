@@ -658,6 +658,81 @@ describe('task stacking', () => {
   });
 });
 
+describe('integration: /auto fresh context', () => {
+  it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
+    const { pi, ctx, sm, sentCustomMessages, releaseNextIdle, flushMicrotasks } = makeAutoHarness();
+
+    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
+    sm.appendMessage(assistantMessage('working on main...'));
+
+    const tool = createPushTaskTool(pi);
+    await tool.execute('call-1', { prompt: 'Analyze performance.' }, undefined, undefined, ctx);
+
+    const auto = createAutoCommand(pi);
+    const running = auto.handler('', ctx);
+
+    await flushMicrotasks();
+    await releaseNextIdle();
+
+    sm.appendMessage(assistantMessage('Found 3 bottlenecks: ...'));
+    await releaseNextIdle();
+    await releaseNextIdle();
+    await running;
+
+    assert.strictEqual(sentCustomMessages.length, 1);
+    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
+    const content = sentCustomMessages[0].content as Array<{ text: string }>;
+    assert.strictEqual(content[0].text, 'Found 3 bottlenecks: ...');
+    assertNoActiveTask(ctx.sessionManager);
+  });
+});
+
+describe('integration: /auto branch context', () => {
+  it('returns the branch result to the original leaf for branch-context tasks', async () => {
+    const { pi, ctx, sm, sentCustomMessages, releaseNextIdle, flushMicrotasks } = makeAutoHarness();
+
+    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
+    sm.appendMessage(assistantMessage('working...'));
+
+    const tool = createPushTaskTool(pi);
+    await tool.execute('call-1', { prompt: 'Quick fix.', context: 'branch' }, undefined, undefined, ctx);
+
+    const auto = createAutoCommand(pi);
+    const running = auto.handler('', ctx);
+
+    await flushMicrotasks();
+    await releaseNextIdle();
+
+    sm.appendMessage(assistantMessage('Fixed the bug.'));
+    await releaseNextIdle();
+    await releaseNextIdle();
+    await running;
+
+    assert.strictEqual(sentCustomMessages.length, 1);
+    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
+    const content = sentCustomMessages[0].content as Array<{ text: string }>;
+    assert.strictEqual(content[0].text, 'Fixed the bug.');
+  });
+
+  it('stops when navigation is cancelled and does not mark the task done', async () => {
+    const { pi, ctx, sm, setCancelNextNav, releaseNextIdle, flushMicrotasks } = makeAutoHarness();
+    setCancelNextNav(true);
+
+    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
+    sm.appendCustomEntry(TASK_ENTRY_TYPE, { prompt: 'Analyze performance.' });
+
+    const auto = createAutoCommand(pi);
+    const running = auto.handler('', ctx);
+
+    await flushMicrotasks();
+    await releaseNextIdle();
+    await running;
+
+    assert.strictEqual(countCustomEntries(sm, TASK_DONE_ENTRY_TYPE), 0);
+    assert.ok(pendingTask(sm));
+  });
+});
+
 // ── Test harness ─────────────────────────────────────────────────
 
 function makeHarness() {

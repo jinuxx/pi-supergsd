@@ -8,8 +8,6 @@ import {
   type ToolDefinition,
 } from '@earendil-works/pi-coding-agent';
 
-const autoState = { running: false };
-
 import { Type } from 'typebox';
 
 export default function registerTaskCommands(pi: ExtensionAPI): void {
@@ -23,14 +21,6 @@ export default function registerTaskCommands(pi: ExtensionAPI): void {
   pi.on('session_shutdown', async () => {
     autoState.running = false;
   });
-}
-
-export function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
-  const branch = session.getBranch();
-  const last = branch[branch.length - 1];
-  return last?.type === 'message'
-    && last.message.role === 'assistant'
-    && last.message.stopReason === 'aborted';
 }
 
 export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
@@ -76,6 +66,14 @@ export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
   };
 }
 
+export function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
+  const branch = session.getBranch();
+  const last = branch[branch.length - 1];
+  return last?.type === 'message'
+    && last.message.role === 'assistant'
+    && last.message.stopReason === 'aborted';
+}
+
 export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
   return defineTool({
     name: 'push-task',
@@ -103,7 +101,17 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
   });
 }
 
-export type TaskActionResult = 'cancelled' | void;
+// ── Thin command wrappers ───────────────────────────────────────
+
+export function createStartTaskCommand(pi: ExtensionAPI): CommandOptions {
+  return {
+    description: 'Navigate to a fresh context and inject the active task prompt',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      await ctx.waitForIdle();
+      await startTask(pi, ctx);
+    },
+  };
+}
 
 export async function startTask(
   pi: ExtensionAPI,
@@ -138,6 +146,16 @@ export async function startTask(
   pi.sendUserMessage(activeTask.data.prompt);
 }
 
+export function createDiscardTaskCommand(pi: ExtensionAPI): CommandOptions {
+  return {
+    description: 'Discard the active task without executing it',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      await ctx.waitForIdle();
+      await discardTask(pi, ctx);
+    },
+  };
+}
+
 export async function discardTask(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
@@ -150,6 +168,16 @@ export async function discardTask(
 
   pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
   ctx.ui.notify('Task discarded.', 'info');
+}
+
+export function createFinishTaskCommand(pi: ExtensionAPI): CommandOptions {
+  return {
+    description: 'Finish the current task and return to the task start point',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      await ctx.waitForIdle();
+      await finishTask(pi, ctx);
+    },
+  };
 }
 
 export async function finishTask(
@@ -210,6 +238,16 @@ export async function finishTask(
   ctx.ui.notify(`Task finished. ${label}`, 'info');
 }
 
+export function createAbortTaskCommand(pi: ExtensionAPI): CommandOptions {
+  return {
+    description: 'Abort the current task without finishing',
+    handler: async (_args: string, ctx: ExtensionCommandContext) => {
+      await ctx.waitForIdle();
+      await abortTask(pi, ctx);
+    },
+  };
+}
+
 export async function abortTask(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
@@ -230,52 +268,7 @@ export async function abortTask(
   ctx.ui.notify('Task aborted. Branch abandoned without summary.', 'info');
 }
 
-// ── Thin command wrappers ───────────────────────────────────────
-
-export function createStartTaskCommand(pi: ExtensionAPI): CommandOptions {
-  return {
-    description: 'Navigate to a fresh context and inject the active task prompt',
-    handler: async (_args: string, ctx: ExtensionCommandContext) => {
-      await ctx.waitForIdle();
-      await startTask(pi, ctx);
-    },
-  };
-}
-
-export function createDiscardTaskCommand(pi: ExtensionAPI): CommandOptions {
-  return {
-    description: 'Discard the active task without executing it',
-    handler: async (_args: string, ctx: ExtensionCommandContext) => {
-      await ctx.waitForIdle();
-      await discardTask(pi, ctx);
-    },
-  };
-}
-
-export function createFinishTaskCommand(pi: ExtensionAPI): CommandOptions {
-  return {
-    description: 'Finish the current task and return to the task start point',
-    handler: async (_args: string, ctx: ExtensionCommandContext) => {
-      await ctx.waitForIdle();
-      await finishTask(pi, ctx);
-    },
-  };
-}
-
-export function createAbortTaskCommand(pi: ExtensionAPI): CommandOptions {
-  return {
-    description: 'Abort the current task without finishing',
-    handler: async (_args: string, ctx: ExtensionCommandContext) => {
-      await ctx.waitForIdle();
-      await abortTask(pi, ctx);
-    },
-  };
-}
-
-/** Type guard: is the entry an assistant message with content? */
-function isAssistantMessageEntry(entry: SessionEntry): entry is SessionMessageEntry & { message: { role: 'assistant' } } {
-  return entry.type === 'message' && entry.message.role === 'assistant';
-}
+export type TaskActionResult = 'cancelled' | void;
 
 // ── Lookup utilities ──────────────────────────────────────────────
 
@@ -334,6 +327,24 @@ export interface TaskStartData {
 }
 
 /**
+ * Minimal read-only session interface needed by lookup functions.
+ * Compatible with both ReadonlySessionManager (from ExtensionCommandContext)
+ * and SessionManager (full mutable version).
+ */
+export interface ReadonlySessionLike {
+  getEntries(): SessionEntry[];
+  getLeafId(): string | null;
+  getBranch(): SessionEntry[];
+}
+
+type CommandOptions = Omit<RegisteredCommand, 'name' | 'sourceInfo'>;
+
+/** Type guard: is the entry an assistant message with content? */
+function isAssistantMessageEntry(entry: SessionEntry): entry is SessionMessageEntry & { message: { role: 'assistant' } } {
+  return entry.type === 'message' && entry.message.role === 'assistant';
+}
+
+/**
  * Find the target ID for navigating to a fresh context.
  * Returns the parent of the first model-visible entry, or the branch root as fallback.
  * Returns null if no valid target is found.
@@ -383,18 +394,7 @@ function findPreConversationEntry(
   return null;
 }
 
-/**
- * Minimal read-only session interface needed by lookup functions.
- * Compatible with both ReadonlySessionManager (from ExtensionCommandContext)
- * and SessionManager (full mutable version).
- */
-export interface ReadonlySessionLike {
-  getEntries(): SessionEntry[];
-  getLeafId(): string | null;
-  getBranch(): SessionEntry[];
-}
-
-type CommandOptions = Omit<RegisteredCommand, 'name' | 'sourceInfo'>;
+const autoState = { running: false };
 
 const pushTaskParameters = Type.Object({
   prompt: Type.String({ description: 'Full prompt for the task, including all context and instructions.' }),
