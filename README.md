@@ -1,6 +1,6 @@
 # pi-supergsd
 
-Curated, patched [Superpowers](https://github.com/obra/superpowers) skills for [Pi](https://pi.dev), plus task-automation commands for running skill-driven branches hands-free.
+Curated, patched [Superpowers](https://github.com/obra/superpowers) skills for [Pi](https://pi.dev), plus minimal task-automation without subagents, using the Pi session tree.
 
 ## Install
 
