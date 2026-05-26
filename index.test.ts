@@ -15,6 +15,250 @@ import registerTaskCommands, {
   createAutoCommand,
 } from './index.js';
 
+// ── Registration ─────────────────────────────────────────────────
+
+describe('registration', () => {
+  it('registers the push-task tool and all five task commands', () => {
+    const registered: Array<{ type: string; name: string; description?: string }> = [];
+    const pi = {
+      registerTool: (tool: { name: string; label: string; description: string }) =>
+        registered.push({ type: 'tool', name: tool.name, description: tool.description }),
+      registerCommand: (name: string, opts: { description: string }) =>
+        registered.push({ type: 'command', name, description: opts.description }),
+      on: () => {},
+    } as unknown as ExtensionAPI;
+
+    registerTaskCommands(pi);
+
+    assert.deepStrictEqual(registered, [
+      { type: 'tool', name: 'push-task', description: 'Store a task prompt for a user-started navigation branch.' },
+      { type: 'command', name: 'start-task', description: 'Navigate to a fresh context and inject the active task prompt' },
+      { type: 'command', name: 'discard-task', description: 'Discard the active task without executing it' },
+      { type: 'command', name: 'finish-task', description: 'Finish the current task and return to the task start point' },
+      { type: 'command', name: 'abort-task', description: 'Abort the current task without finishing' },
+      { type: 'command', name: 'auto', description: 'Automatically run pushed task branches' },
+    ]);
+  });
+});
+
+// ── Integration: /start-task ─────────────────────────────────────
+
+describe('integration: /start-task fresh context', () => {
+  it('completes /start-task → work → /finish-task with last-response injection', async () => {
+    const { sm, sentMessages, sentCustomMessages, notifications, runPushTask, runStartTask, runFinishTask } =
+      makeHarness();
+
+    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
+    sm.appendMessage(assistantMessage('working on main...'));
+
+    await runPushTask('Analyze performance.');
+    await runStartTask();
+
+    assert.deepStrictEqual(sentMessages, ['Analyze performance.']);
+
+    sm.appendMessage(assistantMessage('Found 3 bottlenecks: ...'));
+
+    await runFinishTask();
+
+    assert.strictEqual(sentCustomMessages.length, 1);
+    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
+    const content = sentCustomMessages[0].content as Array<{ text: string }>;
+    assert.strictEqual(content[0].text, 'Found 3 bottlenecks: ...');
+
+    assertLastNotification(notifications, 'info', 'Task finished. Last response attached.');
+    assertNoActiveTask(sm);
+  });
+});
+
+describe('integration: /start-task branch context', () => {
+  it('completes /start-task branch → work → /finish-task with last-response injection', async () => {
+    const { sm, sentMessages, sentCustomMessages, runPushTask, runStartTask, runFinishTask } =
+      makeHarness();
+
+    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
+    sm.appendMessage(assistantMessage('working...'));
+
+    await runPushTask('Quick fix.', 'branch');
+    await runStartTask();
+
+    assert.deepStrictEqual(sentMessages, ['Quick fix.']);
+
+    sm.appendMessage(assistantMessage('Fixed the bug.'));
+
+    await runFinishTask();
+
+    assert.strictEqual(sentCustomMessages.length, 1);
+    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
+    const content = sentCustomMessages[0].content as Array<{ text: string }>;
+    assert.strictEqual(content[0].text, 'Fixed the bug.');
+  });
+});
+
+// ── Integration: /auto ───────────────────────────────────────────
+
+describe('integration: /auto fresh context', () => {
+  it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
+    const { sm, sentCustomMessages, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+      makeHarness();
+
+    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
+    sm.appendMessage(assistantMessage('working on main...'));
+
+    await runPushTask('Analyze performance.');
+
+    const running = runAuto();
+
+    await flushMicrotasks();
+    await releaseNextIdle();
+
+    sm.appendMessage(assistantMessage('Found 3 bottlenecks: ...'));
+    await releaseNextIdle();
+    await releaseNextIdle();
+    await running;
+
+    assert.strictEqual(sentCustomMessages.length, 1);
+    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
+    const content = sentCustomMessages[0].content as Array<{ text: string }>;
+    assert.strictEqual(content[0].text, 'Found 3 bottlenecks: ...');
+    assertNoActiveTask(sm);
+  });
+});
+
+describe('integration: /auto branch context', () => {
+  it('returns the branch result to the original leaf for branch-context tasks', async () => {
+    const { sm, sentCustomMessages, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+      makeHarness();
+
+    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
+    sm.appendMessage(assistantMessage('working...'));
+
+    await runPushTask('Quick fix.', 'branch');
+
+    const running = runAuto();
+
+    await flushMicrotasks();
+    await releaseNextIdle();
+
+    sm.appendMessage(assistantMessage('Fixed the bug.'));
+    await releaseNextIdle();
+    await releaseNextIdle();
+    await running;
+
+    assert.strictEqual(sentCustomMessages.length, 1);
+    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
+    const content = sentCustomMessages[0].content as Array<{ text: string }>;
+    assert.strictEqual(content[0].text, 'Fixed the bug.');
+  });
+
+  it('stops when navigation is cancelled and does not mark the task done', async () => {
+    const { sm, setCancelNextNav, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+      makeHarness();
+    setCancelNextNav(true);
+
+    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
+
+    await runPushTask('Analyze performance.');
+
+    const running = runAuto();
+
+    await flushMicrotasks();
+    await releaseNextIdle();
+    await running;
+
+    assert.strictEqual(countCustomEntries(sm, TASK_DONE_ENTRY_TYPE), 0);
+    assert.ok(getActiveTask(sm), 'Expected an active task to remain.');
+  });
+});
+
+// ── createAutoCommand ────────────────────────────────────────────
+
+describe('createAutoCommand', () => {
+  it('waits when started with no task, then starts work after a later push-task', async () => {
+    const { sm, sentMessages, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+      makeHarness();
+
+    const running = runAuto();
+
+    await flushMicrotasks();
+    await releaseNextIdle();
+
+    await runPushTask('Review spec.');
+    await releaseNextIdle();
+
+    assert.deepStrictEqual(sentMessages, ['Review spec.']);
+
+    sm.appendMessage(assistantMessage('Done.'));
+    await releaseNextIdle();
+    await releaseNextIdle();
+    await running;
+  });
+
+  it('warns and returns when /auto is already running', async () => {
+    const { pi, notifications, releaseNextIdle, flushMicrotasks, emitSessionShutdown, runAuto } =
+      makeHarness();
+    registerTaskCommands(pi);
+
+    const firstRun = runAuto();
+    await flushMicrotasks();
+
+    await runAuto();
+    assertLastNotification(notifications, 'warning', 'Auto is already running.');
+
+    await emitSessionShutdown();
+    await releaseNextIdle();
+    await firstRun;
+  });
+
+  it('stops instead of finishing the task when the last assistant message was aborted', async () => {
+    const { sm, sentCustomMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
+      makeHarness();
+
+    sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
+
+    await runPushTask('Implement phase 1.', 'branch');
+    await runStartTask();
+    sm.appendMessage(abortedAssistantMessage('Stopped by user.'));
+
+    const running = runAuto();
+
+    await flushMicrotasks();
+    await releaseNextIdle();
+    await running;
+
+    assert.strictEqual(sentCustomMessages.length, 0);
+    assert.strictEqual(countCustomEntries(sm, TASK_DONE_ENTRY_TYPE), 0);
+  });
+
+  it('keeps waiting while follow-up work is pending after finishTask', async () => {
+    const { sm, sentCustomMessages, setPendingMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
+      makeHarness();
+
+    sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
+
+    await runPushTask('Quick fix.', 'branch');
+    await runStartTask();
+    sm.appendMessage(assistantMessage('Fixed the bug.'));
+
+    let resolved = false;
+    const running = runAuto().then(() => {
+      resolved = true;
+    });
+
+    await flushMicrotasks();
+    setPendingMessages(true);
+    await releaseNextIdle();
+    await releaseNextIdle();
+
+    assert.strictEqual(sentCustomMessages.length, 1);
+    assert.strictEqual(resolved, false);
+
+    setPendingMessages(false);
+    await releaseNextIdle();
+    await running;
+    assert.strictEqual(resolved, true);
+  });
+});
+
 // ── Constants (mirrors index.ts internals; strings are stable) ──
 
 const TASK_ENTRY_TYPE = 'task';
