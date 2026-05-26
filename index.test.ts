@@ -1,5 +1,7 @@
 import assert from 'node:assert';
+
 import { describe, it } from 'node:test';
+
 import {
   SessionManager,
   type ExtensionAPI,
@@ -124,6 +126,11 @@ describe('integration: /auto fresh context', () => {
   });
 });
 
+function assertNoActiveTask(sm: SessionManager): void {
+  const task = getActiveTask(sm);
+  assert.strictEqual(task, null, `Expected no active task, but found: ${JSON.stringify(task)}`);
+}
+
 describe('integration: /auto branch context', () => {
   it('returns the branch result to the original leaf for branch-context tasks', async () => {
     const { sm, sentCustomMessages, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
@@ -169,6 +176,25 @@ describe('integration: /auto branch context', () => {
     assert.ok(getActiveTask(sm), 'Expected an active task to remain.');
   });
 });
+
+function getActiveTask(sm: SessionManager): TaskShape | null {
+  const branch = sm.getBranch();
+  let skip = 0;
+  for (let i = branch.length - 1; i >= 0; i--) {
+    const e = branch[i];
+    if (e.type === 'custom' && e.customType === TASK_DONE_ENTRY_TYPE) {
+      skip++;
+    } else if (e.type === 'custom' && e.customType === 'task') {
+      if (skip === 0) return e.data as TaskShape;
+      skip--;
+    }
+  }
+  return null;
+}
+
+// ── Assertion helpers ───────────────────────────────────────────
+
+interface TaskShape { prompt: string; context?: string }
 
 // ── createAutoCommand ────────────────────────────────────────────
 
@@ -259,10 +285,6 @@ describe('createAutoCommand', () => {
   });
 });
 
-// ── Constants (mirrors index.ts internals; strings are stable) ──
-
-const TASK_ENTRY_TYPE = 'task';
-const TASK_START_ENTRY_TYPE = 'task-start';
 const TASK_DONE_ENTRY_TYPE = 'task-done';
 
 // ── Test harness ─────────────────────────────────────────────────
@@ -418,10 +440,6 @@ function makeHarness() {
   };
 }
 
-// ── Assistant message builders ───────────────────────────────────
-
-type AppendMessageInput = Parameters<SessionManager['appendMessage']>[0];
-
 function assistantMessage(text: string): AppendMessageInput {
   return {
     role: 'assistant',
@@ -443,52 +461,9 @@ function abortedAssistantMessage(text: string): AppendMessageInput {
   } as AppendMessageInput;
 }
 
-// ── Assertion helpers ───────────────────────────────────────────
+// ── Assistant message builders ───────────────────────────────────
 
-interface TaskStartShape { returnTo: string }
-interface TaskShape { prompt: string; context?: string }
-
-function getTaskStart(sm: SessionManager): TaskStartShape | null {
-  const branch = sm.getBranch();
-  for (let i = branch.length - 1; i >= 0; i--) {
-    const e = branch[i];
-    if (e.type === 'custom' && e.customType === TASK_START_ENTRY_TYPE) {
-      return e.data as TaskStartShape;
-    }
-  }
-  return null;
-}
-
-function assertTaskStart(sm: SessionManager): TaskStartShape {
-  const ts = getTaskStart(sm);
-  assert.ok(ts, 'Expected task start, found none.');
-  return ts;
-}
-
-function getActiveTask(sm: SessionManager): TaskShape | null {
-  const branch = sm.getBranch();
-  let skip = 0;
-  for (let i = branch.length - 1; i >= 0; i--) {
-    const e = branch[i];
-    if (e.type === 'custom' && e.customType === TASK_DONE_ENTRY_TYPE) {
-      skip++;
-    } else if (e.type === 'custom' && e.customType === TASK_ENTRY_TYPE) {
-      if (skip === 0) return e.data as TaskShape;
-      skip--;
-    }
-  }
-  return null;
-}
-
-function assertNoActiveTask(sm: SessionManager): void {
-  const task = getActiveTask(sm);
-  assert.strictEqual(task, null, `Expected no active task, but found: ${JSON.stringify(task)}`);
-}
-
-function assertNoTaskStart(sm: SessionManager): void {
-  const ts = getTaskStart(sm);
-  assert.strictEqual(ts, null, `Expected no task start, but found one: ${JSON.stringify(ts)}`);
-}
+type AppendMessageInput = Parameters<SessionManager['appendMessage']>[0];
 
 function countCustomEntries(sm: SessionManager, customType: string): number {
   return sm
@@ -497,9 +472,17 @@ function countCustomEntries(sm: SessionManager, customType: string): number {
     .length;
 }
 
-interface Notification {
-  message: string;
-  type?: string;
+function assertLastNotification(
+  notifications: Notification[],
+  type?: string,
+  expectedMessage?: string,
+): Notification {
+  const n = getLastNotification(notifications, type);
+  assert.ok(n, `Expected notification${type ? ` of type '${type}'` : ''}, found none.`);
+  if (expectedMessage !== undefined) {
+    assert.strictEqual(n.message, expectedMessage);
+  }
+  return n;
 }
 
 function getLastNotification(
@@ -514,15 +497,7 @@ function getLastNotification(
   return null;
 }
 
-function assertLastNotification(
-  notifications: Notification[],
-  type?: string,
-  expectedMessage?: string,
-): Notification {
-  const n = getLastNotification(notifications, type);
-  assert.ok(n, `Expected notification${type ? ` of type '${type}'` : ''}, found none.`);
-  if (expectedMessage !== undefined) {
-    assert.strictEqual(n.message, expectedMessage);
-  }
-  return n;
+interface Notification {
+  message: string;
+  type?: string;
 }
