@@ -90,11 +90,11 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
         throw new Error('Task storage aborted.');
       }
 
-      pi.appendEntry(TASK_ENTRY_TYPE, { prompt: params.prompt, context: params.context ?? 'fresh' });
+      pi.appendEntry(TASK_ENTRY_TYPE, { prompt: params.prompt, inherit_context: params.inherit_context ?? false });
 
       return {
         content: [{ type: 'text', text: 'Task stored. Use `/start-task` or `/auto` to start it.' }],
-        details: {},
+        details: { prompt: params.prompt, inherit_context: params.inherit_context ?? false },
         terminate: true,
       };
     },
@@ -123,9 +123,9 @@ async function startTask(
     return;
   }
 
-  const taskContext = activeTask.data.context ?? 'fresh';
+  const inheritContext = activeTask.data.inherit_context ?? false;
 
-  if (taskContext === 'fresh') {
+  if (!inheritContext) {
     const departureLeafId = ctx.sessionManager.getLeafId()!;
     const freshTargetId = findFreshTargetId(ctx.sessionManager);
     if (!freshTargetId) {
@@ -300,7 +300,7 @@ const TASK_DONE_ENTRY_TYPE = 'task-done';
 
 interface TaskData {
   prompt: string;
-  context: 'fresh' | 'branch';
+  inherit_context: boolean;
 }
 
 function currentTask(
@@ -396,8 +396,8 @@ const autoState = { running: false };
 
 const pushTaskParameters = Type.Object({
   prompt: Type.String({ description: 'Full prompt for the task, including all context and instructions.' }),
-  context: Type.Optional(Type.Union([
-    Type.Literal('fresh'),
-    Type.Literal('branch'),
-  ], { description: 'Context mode: "fresh" (clean slate, default) or "branch" (current branch).' })),
+  inherit_context: Type.Optional(Type.Boolean({
+    default: false,
+    description: 'Whether to inherit the current branch context instead of starting fresh.',
+  })),
 });
