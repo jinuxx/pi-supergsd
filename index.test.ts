@@ -6,6 +6,7 @@ import {
   SessionManager,
   type ExtensionAPI,
   type ExtensionCommandContext,
+  buildSessionContext,
 } from '@earendil-works/pi-coding-agent';
 
 import registerTaskCommands, {
@@ -16,6 +17,140 @@ import registerTaskCommands, {
   createDiscardTaskCommand,
   createAutoCommand,
 } from './index.js';
+
+// ── Integration: /start-task ─────────────────────────────────────
+
+describe('integration: /start-task fresh context', () => {
+  it('completes /start-task → work → /finish-task with last-response injection', async () => {
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runStartTask, runFinishTask } =
+      makeHarness();
+
+    appendUserMessage('main work');
+    appendAssistantMessage('working on main...');
+    await runPushTask('Analyze performance.');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
+    await runStartTask();
+    // Fresh context branches from the first visible entry, so 'main work' is included
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'Analyze performance.']);
+    assert.ok(isLlmTriggered());
+    assert.strictEqual(getLastHint(), undefined);
+
+    appendAssistantMessage('Found 3 bottlenecks: ...');
+
+    await runFinishTask();
+    assert.deepStrictEqual(getLlmHistory(), [
+      'main work',
+      'working on main...',
+      'Found 3 bottlenecks: ...',
+    ]);
+    assert.ok(isLlmTriggered());
+    assert.ok(getLastHint()?.includes('Task finished'));
+  });
+});
+
+describe('integration: /start-task branch context', () => {
+  it('completes /start-task branch → work → /finish-task with last-response injection', async () => {
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runStartTask, runFinishTask } =
+      makeHarness();
+
+    appendUserMessage('main work');
+    appendAssistantMessage('working...');
+    await runPushTask('Quick fix.', 'branch');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
+    await runStartTask();
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
+    assert.ok(isLlmTriggered());
+    assert.strictEqual(getLastHint(), undefined);
+
+    appendAssistantMessage('Fixed the bug.');
+
+    await runFinishTask();
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
+    assert.ok(isLlmTriggered());
+    assert.ok(getLastHint()?.includes('Task finished'));
+  });
+});
+
+// ── Integration: /auto ───────────────────────────────────────────
+
+describe('integration: /auto fresh context', () => {
+  it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+      makeHarness();
+
+    appendUserMessage('main work');
+    appendAssistantMessage('working on main...');
+    await runPushTask('Analyze performance.');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
+    const running = runAuto();
+
+    await flushMicrotasks();
+    await releaseNextIdle();
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'Analyze performance.']);
+
+    appendAssistantMessage('Found 3 bottlenecks: ...');
+
+    await releaseNextIdle();
+    await releaseNextIdle();
+    await running;
+    assert.deepStrictEqual(getLlmHistory(), [
+      'main work',
+      'working on main...',
+      'Found 3 bottlenecks: ...',
+    ]);
+    assert.ok(isLlmTriggered());
+    assert.ok(getLastHint()?.includes('Task finished'));
+  });
+});
+
+describe('integration: /auto branch context', () => {
+  it('returns the branch result to the original leaf for branch-context tasks', async () => {
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+      makeHarness();
+
+    appendUserMessage('main work');
+    appendAssistantMessage('working...');
+    await runPushTask('Quick fix.', 'branch');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
+    const running = runAuto();
+
+    await flushMicrotasks();
+    await releaseNextIdle();
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
+
+    appendAssistantMessage('Fixed the bug.');
+
+    await releaseNextIdle();
+    await releaseNextIdle();
+    await running;
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
+    assert.ok(isLlmTriggered());
+    assert.ok(getLastHint()?.includes('Task finished'));
+  });
+
+  it('stops when navigation is cancelled and does not mark the task done', async () => {
+    const { appendUserMessage, getLlmHistory, isLlmTriggered, getLastHint, setCancelNextNav, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+      makeHarness();
+
+    appendUserMessage('main work');
+    await runPushTask('Analyze performance.');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
+    setCancelNextNav(true);
+
+    const running = runAuto();
+
+    await flushMicrotasks();
+    await releaseNextIdle();
+    await running;
+    assert.ok(!isLlmTriggered());
+    assert.deepStrictEqual(getLlmHistory(), ['main work']);
+  });
+});
 
 // ── Registration ─────────────────────────────────────────────────
 
@@ -43,164 +178,55 @@ describe('registration', () => {
   });
 });
 
-// ── Integration: /start-task ─────────────────────────────────────
+// ── discardTask ──────────────────────────────────────────────────
 
-describe('integration: /start-task fresh context', () => {
-  it('completes /start-task → work → /finish-task with last-response injection', async () => {
-    const { sm, sentMessages, sentCustomMessages, notifications, runPushTask, runStartTask, runFinishTask } =
+describe('discardTask', () => {
+  it('discards a pending task without triggering the LLM', async () => {
+    const { appendUserMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runDiscardTask } =
       makeHarness();
 
-    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
-    sm.appendMessage(assistantMessage('working on main...'));
+    appendUserMessage('main work');
+    await runPushTask('Quick fix.');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
-    await runPushTask('Analyze performance.');
-    await runStartTask();
-
-    assert.deepStrictEqual(sentMessages, ['Analyze performance.']);
-
-    sm.appendMessage(assistantMessage('Found 3 bottlenecks: ...'));
-
-    await runFinishTask();
-
-    assert.strictEqual(sentCustomMessages.length, 1);
-    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
-    const content = sentCustomMessages[0].content as Array<{ text: string }>;
-    assert.strictEqual(content[0].text, 'Found 3 bottlenecks: ...');
-
-    assertLastNotification(notifications, 'info', 'Task finished. Last response attached.');
-    assertNoActiveTask(sm);
+    await runDiscardTask();
+    assert.strictEqual(getLastHint(), 'Task discarded.');
+    assert.ok(!isLlmTriggered());
+    assert.deepStrictEqual(getLlmHistory(), ['main work']);
   });
 });
 
-describe('integration: /start-task branch context', () => {
-  it('completes /start-task branch → work → /finish-task with last-response injection', async () => {
-    const { sm, sentMessages, sentCustomMessages, runPushTask, runStartTask, runFinishTask } =
+// ── abortTask ───────────────────────────────────────────────────
+
+describe('abortTask', () => {
+  it('aborts an in-progress task and returns to the original branch', async () => {
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runStartTask, runAbortTask } =
       makeHarness();
 
-    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
-    sm.appendMessage(assistantMessage('working...'));
-
+    appendUserMessage('main work');
+    appendAssistantMessage('working...');
     await runPushTask('Quick fix.', 'branch');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
     await runStartTask();
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
+    assert.ok(isLlmTriggered());
+    assert.strictEqual(getLastHint(), undefined);
 
-    assert.deepStrictEqual(sentMessages, ['Quick fix.']);
+    appendAssistantMessage('Partial work...');
 
-    sm.appendMessage(assistantMessage('Fixed the bug.'));
-
-    await runFinishTask();
-
-    assert.strictEqual(sentCustomMessages.length, 1);
-    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
-    const content = sentCustomMessages[0].content as Array<{ text: string }>;
-    assert.strictEqual(content[0].text, 'Fixed the bug.');
+    await runAbortTask();
+    assert.strictEqual(getLastHint(), 'Task aborted. Branch abandoned without summary.');
+    assert.ok(!isLlmTriggered());
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...']);
   });
 });
-
-// ── Integration: /auto ───────────────────────────────────────────
-
-describe('integration: /auto fresh context', () => {
-  it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
-    const { sm, sentCustomMessages, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
-      makeHarness();
-
-    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
-    sm.appendMessage(assistantMessage('working on main...'));
-
-    await runPushTask('Analyze performance.');
-
-    const running = runAuto();
-
-    await flushMicrotasks();
-    await releaseNextIdle();
-
-    sm.appendMessage(assistantMessage('Found 3 bottlenecks: ...'));
-    await releaseNextIdle();
-    await releaseNextIdle();
-    await running;
-
-    assert.strictEqual(sentCustomMessages.length, 1);
-    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
-    const content = sentCustomMessages[0].content as Array<{ text: string }>;
-    assert.strictEqual(content[0].text, 'Found 3 bottlenecks: ...');
-    assertNoActiveTask(sm);
-  });
-});
-
-function assertNoActiveTask(sm: SessionManager): void {
-  const task = getActiveTask(sm);
-  assert.strictEqual(task, null, `Expected no active task, but found: ${JSON.stringify(task)}`);
-}
-
-describe('integration: /auto branch context', () => {
-  it('returns the branch result to the original leaf for branch-context tasks', async () => {
-    const { sm, sentCustomMessages, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
-      makeHarness();
-
-    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
-    sm.appendMessage(assistantMessage('working...'));
-
-    await runPushTask('Quick fix.', 'branch');
-
-    const running = runAuto();
-
-    await flushMicrotasks();
-    await releaseNextIdle();
-
-    sm.appendMessage(assistantMessage('Fixed the bug.'));
-    await releaseNextIdle();
-    await releaseNextIdle();
-    await running;
-
-    assert.strictEqual(sentCustomMessages.length, 1);
-    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
-    const content = sentCustomMessages[0].content as Array<{ text: string }>;
-    assert.strictEqual(content[0].text, 'Fixed the bug.');
-  });
-
-  it('stops when navigation is cancelled and does not mark the task done', async () => {
-    const { sm, setCancelNextNav, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
-      makeHarness();
-    setCancelNextNav(true);
-
-    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
-
-    await runPushTask('Analyze performance.');
-
-    const running = runAuto();
-
-    await flushMicrotasks();
-    await releaseNextIdle();
-    await running;
-
-    assert.strictEqual(countCustomEntries(sm, TASK_DONE_ENTRY_TYPE), 0);
-    assert.ok(getActiveTask(sm), 'Expected an active task to remain.');
-  });
-});
-
-function getActiveTask(sm: SessionManager): TaskShape | null {
-  const branch = sm.getBranch();
-  let skip = 0;
-  for (let i = branch.length - 1; i >= 0; i--) {
-    const e = branch[i];
-    if (e.type === 'custom' && e.customType === TASK_DONE_ENTRY_TYPE) {
-      skip++;
-    } else if (e.type === 'custom' && e.customType === 'task') {
-      if (skip === 0) return e.data as TaskShape;
-      skip--;
-    }
-  }
-  return null;
-}
-
-// ── Assertion helpers ───────────────────────────────────────────
-
-interface TaskShape { prompt: string; context?: string }
 
 // ── createAutoCommand ────────────────────────────────────────────
 
 describe('createAutoCommand', () => {
   it('waits when started with no task, then starts work after a later push-task', async () => {
-    const { sm, sentMessages, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendAssistantMessage, getLlmHistory, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
     const running = runAuto();
@@ -209,61 +235,66 @@ describe('createAutoCommand', () => {
     await releaseNextIdle();
 
     await runPushTask('Review spec.');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
     await releaseNextIdle();
+    assert.deepStrictEqual(getLlmHistory(), ['Review spec.']);
 
-    assert.deepStrictEqual(sentMessages, ['Review spec.']);
+    appendAssistantMessage('Done.');
 
-    sm.appendMessage(assistantMessage('Done.'));
     await releaseNextIdle();
     await releaseNextIdle();
     await running;
   });
 
   it('warns and returns when /auto is already running', async () => {
-    const { pi, notifications, releaseNextIdle, flushMicrotasks, emitSessionShutdown, runAuto } =
+    const { getLastHint, releaseNextIdle, flushMicrotasks, emitSessionShutdown, runAuto } =
       makeHarness();
-    registerTaskCommands(pi);
 
     const firstRun = runAuto();
     await flushMicrotasks();
 
     await runAuto();
-    assertLastNotification(notifications, 'warning', 'Auto is already running.');
+    assert.strictEqual(getLastHint(), 'Auto is already running.');
 
     await emitSessionShutdown();
     await releaseNextIdle();
     await firstRun;
   });
 
-  it('stops instead of finishing the task when the last assistant message was aborted', async () => {
-    const { sm, sentCustomMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
+  it('stops when the last assistant message was aborted', async () => {
+    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
       makeHarness();
 
-    sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
-
+    appendUserMessage('start');
     await runPushTask('Implement phase 1.', 'branch');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
     await runStartTask();
-    sm.appendMessage(abortedAssistantMessage('Stopped by user.'));
+    assert.strictEqual(getLastHint(), undefined);
+
+    appendAssistantMessage('Stopped by user.', 'aborted');
 
     const running = runAuto();
 
     await flushMicrotasks();
     await releaseNextIdle();
     await running;
-
-    assert.strictEqual(sentCustomMessages.length, 0);
-    assert.strictEqual(countCustomEntries(sm, TASK_DONE_ENTRY_TYPE), 0);
+    assert.ok(!isLlmTriggered());
   });
 
   it('keeps waiting while follow-up work is pending after finishTask', async () => {
-    const { sm, sentCustomMessages, setPendingMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, getLastHint, setPendingMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
       makeHarness();
 
-    sm.appendMessage({ role: 'user', content: 'start', timestamp: 0 });
-
+    appendUserMessage('start');
     await runPushTask('Quick fix.', 'branch');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
     await runStartTask();
-    sm.appendMessage(assistantMessage('Fixed the bug.'));
+    assert.strictEqual(getLastHint(), undefined);
+
+    appendAssistantMessage('Fixed the bug.');
 
     let resolved = false;
     const running = runAuto().then(() => {
@@ -274,8 +305,7 @@ describe('createAutoCommand', () => {
     setPendingMessages(true);
     await releaseNextIdle();
     await releaseNextIdle();
-
-    assert.strictEqual(sentCustomMessages.length, 1);
+    assert.ok(isLlmTriggered());
     assert.strictEqual(resolved, false);
 
     setPendingMessages(false);
@@ -285,18 +315,15 @@ describe('createAutoCommand', () => {
   });
 });
 
-const TASK_DONE_ENTRY_TYPE = 'task-done';
-
 // ── Test harness ─────────────────────────────────────────────────
 
 function makeHarness() {
   const sm = SessionManager.inMemory();
-  const sentMessages: string[] = [];
-  const sentCustomMessages: Array<{ customType: string; content: unknown; options?: unknown }> = [];
-  const notifications: Array<{ message: string; type?: string }> = [];
-  const navigations: Array<{ targetId: string; opts?: unknown }> = [];
   const idleWaiters: Array<() => void> = [];
   const sessionShutdownHandlers: Array<() => unknown> = [];
+  const triggeredCustomMessages = new Set<string>();
+  const triggeredUserMessages = new Set<string>();
+  const hints: Array<{ text: string }> = [];
   let cancelNextNav = false;
   let pendingMessages = false;
 
@@ -307,19 +334,25 @@ function makeHarness() {
     sendUserMessage(content: string | Array<{ type: string; text: string }>) {
       const text = typeof content === 'string' ? content : content.map((b) => b.text).join('');
       sm.appendMessage({ role: 'user', content: text, timestamp: Date.now() });
-      sentMessages.push(text);
+      const branch = sm.getBranch();
+      const last = branch[branch.length - 1];
+      if (last) triggeredUserMessages.add(last.id);
     },
     sendMessage(
       message: { customType: string; content: unknown; display?: boolean; details?: unknown },
       options?: { triggerTurn?: boolean },
     ) {
-      sentCustomMessages.push({ customType: message.customType, content: message.content, options });
       sm.appendCustomMessageEntry(
         message.customType,
         message.content as string,
         message.display ?? true,
         message.details,
       );
+      if (options?.triggerTurn) {
+        const branch = sm.getBranch();
+        const last = branch[branch.length - 1];
+        if (last) triggeredCustomMessages.add(last.id);
+      }
     },
     on(eventName: string, handler: () => unknown) {
       if (eventName === 'session_shutdown') sessionShutdownHandlers.push(handler);
@@ -337,12 +370,11 @@ function makeHarness() {
     hasPendingMessages: () => pendingMessages,
     sessionManager: sm,
     ui: {
-      notify(message: string, type?: string) {
-        notifications.push({ message, type });
+      notify(message: string) {
+        hints.push({ text: message });
       },
     },
-    navigateTree: async (targetId: string, opts?: unknown) => {
-      navigations.push({ targetId, opts });
+    navigateTree: async (targetId: string) => {
       if (cancelNextNav) {
         cancelNextNav = false;
         return { cancelled: true };
@@ -353,6 +385,58 @@ function makeHarness() {
   } as unknown as ExtensionCommandContext & { sessionManager: SessionManager };
 
   // ── Plumbing helpers ──────────────────────────────────────────
+
+  function isLlmTriggered(): boolean {
+    const branch = sm.getBranch();
+    if (branch.length === 0) return false;
+    // Walk backwards past 'custom' entries (data-only bookkeeping, invisible to LLM)
+    for (let i = branch.length - 1; i >= 0; i--) {
+      const entry = branch[i];
+      if (entry.type === 'custom') continue;
+      if (entry.type === 'message' && entry.message.role === 'user') return triggeredUserMessages.has(entry.id);
+      if (entry.type === 'message' && entry.message.role === 'assistant') return false;
+      if (entry.type === 'custom_message') return triggeredCustomMessages.has(entry.id);
+      return false;
+    }
+    return false;
+  }
+
+  function appendUserMessage(text: string): void {
+    sm.appendMessage({ role: 'user', content: text, timestamp: 0 });
+  }
+
+  function appendAssistantMessage(text: string, stopReason?: string): void {
+    sm.appendMessage({
+      role: 'assistant',
+      content: [{ type: 'text', text }],
+      timestamp: 0,
+      model: 'test',
+      provider: 'test',
+      ...(stopReason ? { stopReason } : {}),
+    } as Parameters<typeof sm.appendMessage>[0]);
+  }
+
+  function getLastHint(): string | undefined {
+    if (hints.length === 0) return undefined;
+    const last = hints[hints.length - 1];
+    hints.length = 0;
+    return last.text;
+  }
+
+  function getLlmHistory(): string[] {
+    const ctx = buildSessionContext(sm.getEntries(), sm.getLeafId());
+    return ctx.messages.map(m => {
+      const msg = m as { content?: string | Array<{ type: string; text?: string }> };
+      if (typeof msg.content === 'string') return msg.content;
+      if (!Array.isArray(msg.content)) return '';
+      return msg.content
+        .filter((b): b is { type: 'text'; text: string } =>
+          typeof b === 'object' && b !== null && 'type' in b && b.type === 'text'
+        )
+        .map(b => b.text ?? '')
+        .join('');
+    });
+  }
 
   async function releaseNextIdle() {
     const next = idleWaiters.shift();
@@ -387,45 +471,43 @@ function makeHarness() {
 
   async function runPushTask(prompt: string, context?: 'fresh' | 'branch') {
     const tool = createPushTaskTool(pi);
-    await tool.execute('call-1', { prompt, context }, undefined, undefined, ctx);
+    const result = await tool.execute('call-1', { prompt, context }, undefined, undefined, ctx);
+    const content = result.content;
+    let text: string;
+    if (typeof content === 'string') {
+      text = content;
+    } else if (Array.isArray(content)) {
+      text = (content[0] as { text: string })?.text ?? '';
+    } else {
+      text = '';
+    }
+    if (text) hints.push({ text });
   }
 
-  async function runStartTask() {
-    const handlerP = createStartTaskCommand(pi).handler('', ctx);
+  async function runTaskCommand(command: { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> }) {
+    const handlerP = command.handler('', ctx);
     await releaseNextIdle();
     await handlerP;
   }
 
-  async function runFinishTask() {
-    const handlerP = createFinishTaskCommand(pi).handler('', ctx);
-    await releaseNextIdle();
-    await handlerP;
-  }
+  const runStartTask = () => runTaskCommand(createStartTaskCommand(pi));
+  const runFinishTask = () => runTaskCommand(createFinishTaskCommand(pi));
+  const runDiscardTask = () => runTaskCommand(createDiscardTaskCommand(pi));
+  const runAbortTask = () => runTaskCommand(createAbortTaskCommand(pi));
 
-  async function runDiscardTask() {
-    const handlerP = createDiscardTaskCommand(pi).handler('', ctx);
-    await releaseNextIdle();
-    await handlerP;
-  }
-
-  async function runAbortTask() {
-    const handlerP = createAbortTaskCommand(pi).handler('', ctx);
-    await releaseNextIdle();
-    await handlerP;
-  }
+  // Auto-register commands so the shutdown handler is set up
+  registerTaskCommands(pi);
 
   function runAuto(): Promise<void> {
     return createAutoCommand(pi).handler('', ctx) as Promise<void>;
   }
 
   return {
-    sm,
-    pi,
-    ctx,
-    sentMessages,
-    sentCustomMessages,
-    notifications,
-    navigations,
+    getLlmHistory,
+    isLlmTriggered,
+    getLastHint,
+    appendUserMessage,
+    appendAssistantMessage,
     releaseNextIdle,
     flushMicrotasks,
     emitSessionShutdown,
@@ -440,64 +522,3 @@ function makeHarness() {
   };
 }
 
-function assistantMessage(text: string): AppendMessageInput {
-  return {
-    role: 'assistant',
-    content: [{ type: 'text', text }],
-    timestamp: 0,
-    model: 'test',
-    provider: 'test',
-  } as AppendMessageInput;
-}
-
-function abortedAssistantMessage(text: string): AppendMessageInput {
-  return {
-    role: 'assistant',
-    content: [{ type: 'text', text }],
-    timestamp: 0,
-    model: 'test',
-    provider: 'test',
-    stopReason: 'aborted',
-  } as AppendMessageInput;
-}
-
-// ── Assistant message builders ───────────────────────────────────
-
-type AppendMessageInput = Parameters<SessionManager['appendMessage']>[0];
-
-function countCustomEntries(sm: SessionManager, customType: string): number {
-  return sm
-    .getEntries()
-    .filter((entry) => entry.type === 'custom' && entry.customType === customType)
-    .length;
-}
-
-function assertLastNotification(
-  notifications: Notification[],
-  type?: string,
-  expectedMessage?: string,
-): Notification {
-  const n = getLastNotification(notifications, type);
-  assert.ok(n, `Expected notification${type ? ` of type '${type}'` : ''}, found none.`);
-  if (expectedMessage !== undefined) {
-    assert.strictEqual(n.message, expectedMessage);
-  }
-  return n;
-}
-
-function getLastNotification(
-  notifications: Notification[],
-  type?: string,
-): Notification | null {
-  for (let i = notifications.length - 1; i >= 0; i--) {
-    if (type === undefined || notifications[i].type === type) {
-      return notifications[i];
-    }
-  }
-  return null;
-}
-
-interface Notification {
-  message: string;
-  type?: string;
-}
