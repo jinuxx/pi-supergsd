@@ -441,7 +441,14 @@ function makeHarness() {
 
   async function runPushTask(prompt: string, context?: 'fresh' | 'branch') {
     const tool = createPushTaskTool(pi);
-    await tool.execute('call-1', { prompt, context }, undefined, undefined, ctx);
+    const result = await tool.execute('call-1', { prompt, context }, undefined, undefined, ctx);
+    const content = result.content;
+    const text = typeof content === 'string'
+      ? content
+      : Array.isArray(content)
+        ? (content[0] as { text: string })?.text ?? ''
+        : '';
+    if (text) hints.push({ text });
   }
 
   async function runStartTask() {
