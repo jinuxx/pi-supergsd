@@ -215,6 +215,32 @@ describe('discardTask', () => {
   });
 });
 
+// ── abortTask ───────────────────────────────────────────────────
+
+describe('abortTask', () => {
+  it('aborts an in-progress task and returns to the original branch', async () => {
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runStartTask, runAbortTask } =
+      makeHarness();
+
+    appendUserMessage('main work');
+    appendAssistantMessage('working...');
+    await runPushTask('Quick fix.', 'branch');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
+    await runStartTask();
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
+    assert.ok(isLlmTriggered());
+    assert.strictEqual(getLastHint(), undefined);
+
+    appendAssistantMessage('Partial work...');
+
+    await runAbortTask();
+    assert.strictEqual(getLastHint(), 'Task aborted. Branch abandoned without summary.');
+    assert.ok(!isLlmTriggered());
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...']);
+  });
+});
+
 // ── createAutoCommand ────────────────────────────────────────────
 
 describe('createAutoCommand', () => {
