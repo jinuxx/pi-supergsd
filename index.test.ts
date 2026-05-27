@@ -7,6 +7,7 @@ import {
   type ExtensionAPI,
   type ExtensionCommandContext,
   buildSessionContext,
+  type Theme,
 } from '@earendil-works/pi-coding-agent';
 
 import registerTaskCommands, {
@@ -56,7 +57,7 @@ describe('integration: /start-task branch context', () => {
 
     appendUserMessage('main work');
     appendAssistantMessage('working...');
-    await runPushTask('Quick fix.', 'branch');
+    await runPushTask('Quick fix.', true);
     assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     await runStartTask();
@@ -113,7 +114,7 @@ describe('integration: /auto branch context', () => {
 
     appendUserMessage('main work');
     appendAssistantMessage('working...');
-    await runPushTask('Quick fix.', 'branch');
+    await runPushTask('Quick fix.', true);
     assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     const running = runAuto();
@@ -205,7 +206,7 @@ describe('abortTask', () => {
 
     appendUserMessage('main work');
     appendAssistantMessage('working...');
-    await runPushTask('Quick fix.', 'branch');
+    await runPushTask('Quick fix.', true);
     assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     await runStartTask();
@@ -267,7 +268,7 @@ describe('createAutoCommand', () => {
       makeHarness();
 
     appendUserMessage('start');
-    await runPushTask('Implement phase 1.', 'branch');
+    await runPushTask('Implement phase 1.', true);
     assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     await runStartTask();
@@ -288,7 +289,7 @@ describe('createAutoCommand', () => {
       makeHarness();
 
     appendUserMessage('start');
-    await runPushTask('Quick fix.', 'branch');
+    await runPushTask('Quick fix.', true);
     assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     await runStartTask();
@@ -326,6 +327,7 @@ function makeHarness() {
   const hints: Array<{ text: string }> = [];
   let cancelNextNav = false;
   let pendingMessages = false;
+  let taskStatus: string | undefined;
 
   const pi = {
     appendEntry(customType: string, data?: unknown) {
@@ -362,6 +364,7 @@ function makeHarness() {
   } as unknown as ExtensionAPI;
 
   const ctx = {
+    hasUI: true,
     waitForIdle: async () => {
       await new Promise<void>((resolve) => {
         idleWaiters.push(resolve);
@@ -373,6 +376,14 @@ function makeHarness() {
       notify(message: string) {
         hints.push({ text: message });
       },
+      setStatus(key: string, value: string | undefined) {
+        if (key === 'task') taskStatus = value;
+      },
+      theme: {
+        fg: (_key: string, text: string) => text,
+        bg: (_key: string, text: string) => text,
+        bold: (text: string) => text,
+      } as unknown as Theme,
     },
     navigateTree: async (targetId: string) => {
       if (cancelNextNav) {
@@ -469,9 +480,9 @@ function makeHarness() {
 
   // ── Convenience wrappers (pre-bound to pi / ctx) ───────────────
 
-  async function runPushTask(prompt: string, context?: 'fresh' | 'branch') {
+  async function runPushTask(prompt: string, inherit_context?: boolean) {
     const tool = createPushTaskTool(pi);
-    const result = await tool.execute('call-1', { prompt, context }, undefined, undefined, ctx);
+    const result = await tool.execute('call-1', { prompt, inherit_context }, undefined, undefined, ctx);
     const content = result.content;
     let text: string;
     if (typeof content === 'string') {
@@ -502,10 +513,15 @@ function makeHarness() {
     return createAutoCommand(pi).handler('', ctx) as Promise<void>;
   }
 
+  function getStatus(): string | undefined {
+    return taskStatus;
+  }
+
   return {
     getLlmHistory,
     isLlmTriggered,
     getLastHint,
+    getStatus,
     appendUserMessage,
     appendAssistantMessage,
     releaseNextIdle,
