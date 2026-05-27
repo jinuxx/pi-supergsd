@@ -103,29 +103,32 @@ describe('integration: /start-task branch context', () => {
 
 describe('integration: /auto fresh context', () => {
   it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
-    const { sm, sentCustomMessages, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
-    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
-    sm.appendMessage(assistantMessage('working on main...'));
-
+    appendUserMessage('main work');
+    appendAssistantMessage('working on main...');
     await runPushTask('Analyze performance.');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
 
     const running = runAuto();
 
     await flushMicrotasks();
     await releaseNextIdle();
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'Analyze performance.']);
 
-    sm.appendMessage(assistantMessage('Found 3 bottlenecks: ...'));
+    appendAssistantMessage('Found 3 bottlenecks: ...');
+
     await releaseNextIdle();
     await releaseNextIdle();
     await running;
-
-    assert.strictEqual(sentCustomMessages.length, 1);
-    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
-    const content = sentCustomMessages[0].content as Array<{ text: string }>;
-    assert.strictEqual(content[0].text, 'Found 3 bottlenecks: ...');
-    assertNoActiveTask(sm);
+    assert.deepStrictEqual(getLlmHistory(), [
+      'main work',
+      'working on main...',
+      'Found 3 bottlenecks: ...',
+    ]);
+    assert.ok(isLlmTriggered());
+    assert.ok(getLastHint()?.includes('Task finished'));
   });
 });
 
