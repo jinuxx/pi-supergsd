@@ -298,6 +298,7 @@ function makeHarness() {
   const navigations: Array<{ targetId: string; opts?: unknown }> = [];
   const idleWaiters: Array<() => void> = [];
   const sessionShutdownHandlers: Array<() => unknown> = [];
+  const triggeredCustomMessages = new Set<string>();
   let cancelNextNav = false;
   let pendingMessages = false;
 
@@ -321,6 +322,11 @@ function makeHarness() {
         message.display ?? true,
         message.details,
       );
+      if (options?.triggerTurn) {
+        const branch = sm.getBranch();
+        const last = branch[branch.length - 1];
+        if (last) triggeredCustomMessages.add(last.id);
+      }
     },
     on(eventName: string, handler: () => unknown) {
       if (eventName === 'session_shutdown') sessionShutdownHandlers.push(handler);
@@ -354,6 +360,16 @@ function makeHarness() {
   } as unknown as ExtensionCommandContext & { sessionManager: SessionManager };
 
   // ── Plumbing helpers ──────────────────────────────────────────
+
+  function isLlmTriggered(): boolean {
+    const branch = sm.getBranch();
+    const last = branch[branch.length - 1];
+    if (!last) return false;
+    if (last.type === 'message' && last.message.role === 'user') return true;
+    if (last.type === 'message' && last.message.role === 'assistant') return false;
+    if (last.type === 'custom_message') return triggeredCustomMessages.has(last.id);
+    return false;
+  }
 
   function getLlmHistory(): string[] {
     const ctx = buildSessionContext(sm.getEntries(), sm.getLeafId());
@@ -442,6 +458,7 @@ function makeHarness() {
     notifications,
     navigations,
     getLlmHistory,
+    isLlmTriggered,
     releaseNextIdle,
     flushMicrotasks,
     emitSessionShutdown,
