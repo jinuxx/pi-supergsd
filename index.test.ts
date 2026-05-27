@@ -48,28 +48,30 @@ describe('registration', () => {
 
 describe('integration: /start-task fresh context', () => {
   it('completes /start-task → work → /finish-task with last-response injection', async () => {
-    const { sm, sentMessages, sentCustomMessages, notifications, runPushTask, runStartTask, runFinishTask } =
+    const { appendUserMessage, appendAssistantMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runStartTask, runFinishTask } =
       makeHarness();
 
-    sm.appendMessage({ role: 'user', content: 'main work', timestamp: 0 });
-    sm.appendMessage(assistantMessage('working on main...'));
-
+    appendUserMessage('main work');
+    appendAssistantMessage('working on main...');
     await runPushTask('Analyze performance.');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
     await runStartTask();
+    // Fresh context branches from the first visible entry, so 'main work' is included
+    assert.deepStrictEqual(getLlmHistory(), ['main work', 'Analyze performance.']);
+    assert.ok(isLlmTriggered());
+    assert.strictEqual(getLastHint(), undefined);
 
-    assert.deepStrictEqual(sentMessages, ['Analyze performance.']);
-
-    sm.appendMessage(assistantMessage('Found 3 bottlenecks: ...'));
+    appendAssistantMessage('Found 3 bottlenecks: ...');
 
     await runFinishTask();
-
-    assert.strictEqual(sentCustomMessages.length, 1);
-    assert.strictEqual(sentCustomMessages[0].customType, 'branch-result');
-    const content = sentCustomMessages[0].content as Array<{ text: string }>;
-    assert.strictEqual(content[0].text, 'Found 3 bottlenecks: ...');
-
-    assertLastNotification(notifications, 'info', 'Task finished. Last response attached.');
-    assertNoActiveTask(sm);
+    assert.deepStrictEqual(getLlmHistory(), [
+      'main work',
+      'working on main...',
+      'Found 3 bottlenecks: ...',
+    ]);
+    assert.ok(isLlmTriggered());
+    assert.ok(getLastHint()?.includes('Task finished'));
   });
 });
 
@@ -343,6 +345,7 @@ function makeHarness() {
   const idleWaiters: Array<() => void> = [];
   const sessionShutdownHandlers: Array<() => unknown> = [];
   const triggeredCustomMessages = new Set<string>();
+  const triggeredUserMessages = new Set<string>();
   let hints: Array<{ text: string }> = [];
   let cancelNextNav = false;
   let pendingMessages = false;
@@ -355,6 +358,9 @@ function makeHarness() {
       const text = typeof content === 'string' ? content : content.map((b) => b.text).join('');
       sm.appendMessage({ role: 'user', content: text, timestamp: Date.now() });
       sentMessages.push(text);
+      const branch = sm.getBranch();
+      const last = branch[branch.length - 1];
+      if (last) triggeredUserMessages.add(last.id);
     },
     sendMessage(
       message: { customType: string; content: unknown; display?: boolean; details?: unknown },
@@ -409,11 +415,16 @@ function makeHarness() {
 
   function isLlmTriggered(): boolean {
     const branch = sm.getBranch();
-    const last = branch[branch.length - 1];
-    if (!last) return false;
-    if (last.type === 'message' && last.message.role === 'user') return true;
-    if (last.type === 'message' && last.message.role === 'assistant') return false;
-    if (last.type === 'custom_message') return triggeredCustomMessages.has(last.id);
+    if (branch.length === 0) return false;
+    // Walk backwards past 'custom' entries (data-only bookkeeping, invisible to LLM)
+    for (let i = branch.length - 1; i >= 0; i--) {
+      const entry = branch[i];
+      if (entry.type === 'custom') continue;
+      if (entry.type === 'message' && entry.message.role === 'user') return triggeredUserMessages.has(entry.id);
+      if (entry.type === 'message' && entry.message.role === 'assistant') return false;
+      if (entry.type === 'custom_message') return triggeredCustomMessages.has(entry.id);
+      return false;
+    }
     return false;
   }
 
