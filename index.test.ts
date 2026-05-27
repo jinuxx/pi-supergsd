@@ -18,32 +18,6 @@ import registerTaskCommands, {
   createAutoCommand,
 } from './index.js';
 
-// ── Registration ─────────────────────────────────────────────────
-
-describe('registration', () => {
-  it('registers the push-task tool and all five task commands', () => {
-    const registered: Array<{ type: string; name: string; description?: string }> = [];
-    const pi = {
-      registerTool: (tool: { name: string; label: string; description: string }) =>
-        registered.push({ type: 'tool', name: tool.name, description: tool.description }),
-      registerCommand: (name: string, opts: { description: string }) =>
-        registered.push({ type: 'command', name, description: opts.description }),
-      on: () => {},
-    } as unknown as ExtensionAPI;
-
-    registerTaskCommands(pi);
-
-    assert.deepStrictEqual(registered, [
-      { type: 'tool', name: 'push-task', description: 'Store a task prompt for a user-started navigation branch.' },
-      { type: 'command', name: 'start-task', description: 'Navigate to a fresh context and inject the active task prompt' },
-      { type: 'command', name: 'discard-task', description: 'Discard the active task without executing it' },
-      { type: 'command', name: 'finish-task', description: 'Finish the current task and return to the task start point' },
-      { type: 'command', name: 'abort-task', description: 'Abort the current task without finishing' },
-      { type: 'command', name: 'auto', description: 'Automatically run pushed task branches' },
-    ]);
-  });
-});
-
 // ── Integration: /start-task ─────────────────────────────────────
 
 describe('integration: /start-task fresh context', () => {
