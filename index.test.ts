@@ -224,7 +224,7 @@ describe('abortTask', () => {
 
 describe('createAutoCommand', () => {
   it('waits when started with no task, then starts work after a later push-task', async () => {
-    const { sm, sentMessages, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
+    const { appendAssistantMessage, getLlmHistory, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runAuto } =
       makeHarness();
 
     const running = runAuto();
@@ -233,11 +233,13 @@ describe('createAutoCommand', () => {
     await releaseNextIdle();
 
     await runPushTask('Review spec.');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
     await releaseNextIdle();
+    assert.deepStrictEqual(getLlmHistory(), ['Review spec.']);
 
-    assert.deepStrictEqual(sentMessages, ['Review spec.']);
+    appendAssistantMessage('Done.');
 
-    sm.appendMessage(assistantMessage('Done.'));
     await releaseNextIdle();
     await releaseNextIdle();
     await running;
