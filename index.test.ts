@@ -373,6 +373,20 @@ function makeHarness() {
     return false;
   }
 
+  function appendUserMessage(text: string): void {
+    sm.appendMessage({ role: 'user', content: text, timestamp: 0 });
+  }
+
+  function appendAssistantMessage(text: string): void {
+    sm.appendMessage({
+      role: 'assistant',
+      content: [{ type: 'text', text }],
+      timestamp: 0,
+      model: 'test',
+      provider: 'test',
+    });
+  }
+
   function getLastHint(): string | undefined {
     if (hints.length === 0) return undefined;
     const last = hints[hints.length - 1];
@@ -469,6 +483,8 @@ function makeHarness() {
     getLlmHistory,
     isLlmTriggered,
     getLastHint,
+    appendUserMessage,
+    appendAssistantMessage,
     releaseNextIdle,
     flushMicrotasks,
     emitSessionShutdown,
