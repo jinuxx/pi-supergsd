@@ -113,7 +113,33 @@ When neither a pending nor current task exists, clear the status: `ctx.ui.setSta
 
 Status is recomputed on: `session_start`, `turn_end`, `session_tree`, and immediately after `push-task` execution.
 
-## 6. Testing
+## 6. Branch-result message label
+
+When `/finish-task` completes, it injects the last assistant response as a `branch-result` custom message. Currently the label displays as `[branch-result]`. Replace with a slug-based label.
+
+**Implementation:**
+
+1. In `finishTask()`, after navigating back to `returnTo`, find the original task entry (walk backward from `task-start` to the matching `TASK_ENTRY_TYPE` entry) and compute a slug from its prompt.
+2. Pass the slug in `details` alongside the existing `sourceEntryId`.
+3. Register a message renderer for `'branch-result'` via `pi.registerMessageRenderer()`:
+   - Label: `"<slug> result:"` in the same styling used for custom message labels (no brackets).
+   - Content: unchanged — the assistant's response text.
+
+```typescript
+pi.registerMessageRenderer('branch-result', (message, { expanded }, theme) => {
+  const details = message.details as { slug?: string };
+  const label = details.slug
+    ? theme.fg("customMessageLabel", `${details.slug} result:`)
+    : theme.fg("customMessageLabel", "result:");
+  const box = new Box(1, 1, (t) => theme.bg("customMessageBg", t));
+  box.addChild(new Text(`${label}\n${message.content}`, 0, 0));
+  return box;
+});
+```
+
+Theme colors: `customMessageLabel`, `customMessageBg`.
+
+## 7. Testing
 
 ### Test harness changes
 
@@ -125,10 +151,10 @@ Status is recomputed on: `session_start`, `turn_end`, `session_tree`, and immedi
 
 All existing call sites that pass a `context` argument update to `inherit_context`. Add status assertions at critical points in existing tests — verify correct slug after push-task, after start-task, and cleared after finish-task/abort-task/discard-task. No new test blocks; all assertions folded into existing test cases.
 
-## 7. Files changed
+## 8. Files changed
 
 | File | Changes |
 |------|---------|
-| `index.ts` | Parameter schema, `TaskData`, `execute()`, `startTask()`, `renderCall`, `renderResult`, `makeSlug`, status hooks, post-push-task status trigger |
+| `index.ts` | Parameter schema, `TaskData`, `execute()`, `startTask()`, `renderCall`, `renderResult`, `makeSlug`, status hooks, post-push-task status trigger, `registerMessageRenderer` for branch-result, slug in `finishTask()` details |
 | `index.test.ts` | `runPushTask` signature update, `getStatus()` helper, status assertions, `context` → `inherit_context` references |
 | `README.md` | Parameter description, usage example |
