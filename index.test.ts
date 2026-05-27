@@ -473,37 +473,27 @@ function makeHarness() {
     const tool = createPushTaskTool(pi);
     const result = await tool.execute('call-1', { prompt, context }, undefined, undefined, ctx);
     const content = result.content;
-    const text = typeof content === 'string'
-      ? content
-      : Array.isArray(content)
-        ? (content[0] as { text: string })?.text ?? ''
-        : '';
+    let text: string;
+    if (typeof content === 'string') {
+      text = content;
+    } else if (Array.isArray(content)) {
+      text = (content[0] as { text: string })?.text ?? '';
+    } else {
+      text = '';
+    }
     if (text) hints.push({ text });
   }
 
-  async function runStartTask() {
-    const handlerP = createStartTaskCommand(pi).handler('', ctx);
+  async function runTaskCommand(command: { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> }) {
+    const handlerP = command.handler('', ctx);
     await releaseNextIdle();
     await handlerP;
   }
 
-  async function runFinishTask() {
-    const handlerP = createFinishTaskCommand(pi).handler('', ctx);
-    await releaseNextIdle();
-    await handlerP;
-  }
-
-  async function runDiscardTask() {
-    const handlerP = createDiscardTaskCommand(pi).handler('', ctx);
-    await releaseNextIdle();
-    await handlerP;
-  }
-
-  async function runAbortTask() {
-    const handlerP = createAbortTaskCommand(pi).handler('', ctx);
-    await releaseNextIdle();
-    await handlerP;
-  }
+  const runStartTask = () => runTaskCommand(createStartTaskCommand(pi));
+  const runFinishTask = () => runTaskCommand(createFinishTaskCommand(pi));
+  const runDiscardTask = () => runTaskCommand(createDiscardTaskCommand(pi));
+  const runAbortTask = () => runTaskCommand(createAbortTaskCommand(pi));
 
   // Auto-register commands so the shutdown handler is set up
   registerTaskCommands(pi);
