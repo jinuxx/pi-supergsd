@@ -2,31 +2,29 @@
 
 ## Goal
 
-Rewrite the `push-task` extension test harness and tests to use a "user perspective" API: tests verify what the LLM would see and whether it would be triggered, instead of asserting on internal message-sending mechanics (`sentMessages`, `sentCustomMessages`).
+Rewrite the `push-task` extension test harness and tests to use a "user perspective" API: tests verify the full LLM-visible message history and whether the last entry would trigger the LLM, instead of asserting on internal message-sending mechanics.
 
 ## Removals
 
 ### From tests
 
 - Entire `describe('registration', ...)` block
-- Test: "warns and returns when /auto is already running" — rewritten (no `pi`/`notifications` exposure needed)
-- Test: "stops instead of finishing the task when the last assistant message was aborted" — removed (abortion edge case)
+- Test: "stops instead of finishing the task when the last assistant message was aborted" — removed
 
 ### From harness
 
-- `sentMessages[]`, `sentCustomMessages[]`, `navigations[]` arrays (replaced by `lastTriggered` boolean)
-- `abortedAssistantMessage()` helper (removed with its test)
-- `runAbortTask()`, `runDiscardTask()` (already unused)
-- `assertNoActiveTask()`, `getActiveTask()`, `countCustomEntries()` (task-internal, not user-visible)
+- `sentMessages[]`, `sentCustomMessages[]`, `navigations[]` arrays
+- `abortedAssistantMessage()` helper
+- `assertNoActiveTask()`, `getActiveTask()`, `countCustomEntries()` — task-internal, not user-visible
 - `assertLastNotification()`, old `getLastNotification()`, `Notification` interface
 - `TaskShape` interface, `TASK_DONE_ENTRY_TYPE` constant
-- `pi`, `ctx`, `sm` — no longer exposed; harness owns them fully. Commands are auto-registered internally.
+- `pi`, `ctx`, `sm` — no longer exposed; harness owns them fully
 
 ### Retained from harness
 
 - `releaseNextIdle()`, `flushMicrotasks()`, `emitSessionShutdown()`
 - `setPendingMessages()`, `setCancelNextNav()`
-- `runPushTask()`, `runStartTask()`, `runFinishTask()`, `runAuto()`
+- `runPushTask()`, `runStartTask()`, `runFinishTask()`, `runDiscardTask()`, `runAbortTask()`, `runAuto()`
 
 ## New public API (`makeHarness()` return)
 
@@ -36,11 +34,11 @@ appendUserMessage(text: string): void
 appendAssistantMessage(text: string): void
 
 // LLM perspective
-getLlmHistory(): string[]         // buildSessionContext at current leaf, text blocks only
-isLlmTriggered(): boolean         // would the last entry trigger the LLM?
+getLlmHistory(): string[]       // buildSessionContext at current leaf, text blocks only
+isLlmTriggered(): boolean       // would the last entry on the branch trigger the LLM?
 
 // Notifications
-getLastNotification(): string | undefined  // last notify() text, or undefined
+getLastNotification(): string | undefined
 ```
 
 ## Implementation details
@@ -55,31 +53,35 @@ The harness creates `pi` and `ctx` mocks internally and calls `registerTaskComma
 pi.sendUserMessage = (content, _options) => {
   const text = typeof content === 'string' ? content : content.map(b => b.text).join('');
   sm.appendMessage({ role: 'user', content: text, timestamp: Date.now() });
-  lastTriggered = true;  // user messages always trigger
+  // No trigger tracking needed — user messages always trigger (derived from entry type)
 };
 ```
 
 ### `pi.sendMessage()` mock behavior
 
 ```ts
+const triggeredCustomMessages = new Set<string>();
+
 pi.sendMessage = (message, options) => {
-  sm.appendCustomMessageEntry(
+  const entryId = sm.appendCustomMessageEntry(
     message.customType,
     message.content as string,
     message.display ?? true,
     message.details,
   );
-  lastTriggered = options?.triggerTurn === true;
+  if (options?.triggerTurn) {
+    triggeredCustomMessages.add(entryId);
+  }
 };
 ```
 
 ### `appendUserMessage(text)`
 
-Appends `{ role: 'user', content: text, timestamp: 0 }` via `sm.appendMessage()`. Sets `lastTriggered = true`.
+Appends `{ role: 'user', content: text, timestamp: 0 }` via `sm.appendMessage()`.
 
 ### `appendAssistantMessage(text)`
 
-Appends `{ role: 'assistant', content: [{ type: 'text', text }], timestamp: 0, model: 'test', provider: 'test' }` via `sm.appendMessage()`. Sets `lastTriggered = false`.
+Appends `{ role: 'assistant', content: [{ type: 'text', text }], timestamp: 0, model: 'test', provider: 'test' }` via `sm.appendMessage()`.
 
 ### `getLlmHistory()`
 
@@ -103,86 +105,247 @@ function getLlmHistory(): string[] {
 }
 ```
 
-`buildSessionContext` converts `custom_message` entries (branch results) to messages via `createCustomMessage()`, so they appear in the output. The function is live — each call reads the current branch's entries and leaf.
+`buildSessionContext` converts `custom_message` entries (branch results) to messages, so they appear in the output. The function is live — each call reads the current branch's entries and leaf.
 
 Initial state: `[]` (no messages in empty session).
 
 ### `isLlmTriggered()`
 
-Returns `lastTriggered` — a boolean in harness closure:
+Derives trigger state from the last entry on the branch, not a global flag. This correctly reflects state after commands that branch or navigate:
 
-- `pi.sendUserMessage()` → `true`
-- `pi.sendMessage(msg, opts)` → `opts.triggerTurn === true`
-- `appendUserMessage()` → `true`
-- `appendAssistantMessage()` → `false`
+```ts
+function isLlmTriggered(): boolean {
+  const branch = sm.getBranch();
+  const last = branch[branch.length - 1];
+  if (!last) return false;
+  if (last.type === 'message' && last.message.role === 'user') return true;
+  if (last.type === 'message' && last.message.role === 'assistant') return false;
+  if (last.type === 'custom_message') return triggeredCustomMessages.has(last.id);
+  return false; // custom, compaction, branch_summary, etc.
+}
+```
 
-Initial state: `false`.
+| Last entry type | Triggered? |
+|---|---|
+| User message | `true` |
+| Assistant message | `false` |
+| Custom message (with `triggerTurn`) | `true` |
+| Custom message (without `triggerTurn`) | `false` |
+| Custom entry (`task`, `task-start`, `task-done`) | `false` |
+| Compaction, branch_summary, etc. | `false` |
+| Empty branch | `false` |
 
 ### `getLastNotification()`
 
-Returns the text of the most recent `ctx.ui.notify(message, _type)` call, or `undefined` if none. Notification type (`'info'`/`'warning'`/`'error'`) is not exposed — the message text alone distinguishes scenarios.
+Returns the text of the most recent `ctx.ui.notify(message, _type)` call, or `undefined` if none. Type is not exposed — message text alone distinguishes scenarios.
 
 Initial state: `undefined`.
 
 ## Test rewrite strategy
 
-### Task lifecycle verification — intentionally dropped
+### Assertion philosophy
 
-Task entries (`task`, `task-start`, `task-done`) are `custom` type entries that `buildSessionContext` ignores. They are implementation details, not user-visible. Tests that previously verified task state (e.g., `assertNoActiveTask`, `countCustomEntries`) now verify LLM-visible outcomes instead:
+Tests assert the **full** `getLlmHistory()` array to validate branching behavior — a fresh-context task shows only the task prompt, a branch-context task includes prior messages, and a finished task shows the original branch with the branch result injected.
 
-| What was asserted | What is asserted now |
-|---|---|
-| Task prompt sent to LLM | `getLlmHistory()` contains the prompt text |
-| Task finished & branch result injected | `isLlmTriggered()` is `true`; `getLlmHistory()` ends with result text |
-| Task not done after cancelled nav | `isLlmTriggered()` is `false` (no branch result sent) |
-| Task cleared after finish | Notification contains "Task finished" |
+Task lifecycle (task entries, task-done count) is not asserted — those are implementation details invisible to the LLM.
 
-### Per-test rewrite plan
+### New tests added
 
-**1. `integration: /start-task fresh context` → `'completes /start-task → work → /finish-task'`**
-- `sm.appendMessage({ role: 'user', ... })` → `appendUserMessage('main work')`
-- `sm.appendMessage(assistantMessage(...))` → `appendAssistantMessage('working on main...')`
-- `assert.deepStrictEqual(sentMessages, [...])` → `assert.ok(isLlmTriggered()); assert.ok(getLlmHistory().some(m => m.includes('Analyze performance.')))`
-- `assert.strictEqual(sentCustomMessages.length, 1)` etc. → `assert.ok(isLlmTriggered()); const h = getLlmHistory(); assert.ok(h[h.length-1].includes('Found 3 bottlenecks'))`
-- `assertLastNotification(...)` → `assert.ok(getLastNotification()?.includes('Task finished'))`
-- `assertNoActiveTask(sm)` → dropped (task lifecycle is internal)
+**`discardTask` — discards a pending task without triggering the LLM**
 
-**2. `integration: /start-task branch context` → `'completes /start-task branch → work → /finish-task'`**
-- Same pattern as test 1, with `'branch'` context
+```ts
+appendUserMessage('main work');
+await runPushTask('Quick fix.');
+await runDiscardTask();
+assert.strictEqual(getLastNotification(), 'Task discarded.');
+assert.ok(!isLlmTriggered());
+assert.deepStrictEqual(getLlmHistory(), ['main work']);
+```
 
-**3. `integration: /auto fresh context` → `'completes push-task → /auto → finish-task'`**
-- Same rewrite pattern
-- `assertNoActiveTask(sm)` → replaced by notification assertion
+**`abortTask` — aborts an in-progress task and returns to the original branch**
 
-**4. `integration: /auto branch context` → `'returns branch result to original leaf'`**
-- Same rewrite pattern
+```ts
+appendUserMessage('main work');
+appendAssistantMessage('working...');
+await runPushTask('Quick fix.', 'branch');
+await runStartTask();
+appendAssistantMessage('Partial work...');
+await runAbortTask();
+assert.strictEqual(getLastNotification(), 'Task aborted. Branch abandoned without summary.');
+assert.ok(!isLlmTriggered());
+assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...']);
+```
 
-**5. `integration: /auto branch context` → `'stops when navigation is cancelled'`**
-- `countCustomEntries(sm, TASK_DONE_ENTRY_TYPE)` → `assert.ok(!isLlmTriggered())` (no branch result injected)
-- `assert.ok(getActiveTask(sm))` → dropped (task lifecycle is internal)
+### Existing tests rewritten
 
-**6. `createAutoCommand` → `'waits when started with no task'`**
-- No assertions change (this test only verifies flow completes)
+**1. `integration: /start-task fresh context` — completes start → work → finish**
 
-**7. `createAutoCommand` → `'warns and returns when /auto is already running'`**
-- `pi` + `registerTaskCommands(pi)` → removed (harness auto-registers)
-- `assertLastNotification(notifications, 'warning', 'Auto is already running.')` → `assert.strictEqual(getLastNotification(), 'Auto is already running.')`
-- `emitSessionShutdown()` stays (needed to unblock first auto)
+```ts
+appendUserMessage('main work');
+appendAssistantMessage('working on main...');
+await runPushTask('Analyze performance.');   // default 'fresh'
+await runStartTask();
+// Fresh context: navigated to new root, only the task prompt is visible
+assert.deepStrictEqual(getLlmHistory(), ['Analyze performance.']);
+assert.ok(isLlmTriggered());
 
-**8. `createAutoCommand` → `'stops instead of finishing the task when the last assistant message was aborted'`**
-- Entire test removed
+appendAssistantMessage('Found 3 bottlenecks: ...');
+await runFinishTask();
+// Navigated back + branch result injected
+assert.deepStrictEqual(getLlmHistory(), [
+  'main work',
+  'working on main...',
+  'Found 3 bottlenecks: ...',
+]);
+assert.ok(isLlmTriggered());
+assert.ok(getLastNotification()?.includes('Task finished'));
+```
 
-**9. `createAutoCommand` → `'keeps waiting while follow-up work is pending after finishTask'`**
-- `sentCustomMessages.length` assertion → `isLlmTriggered()` check
-- Remainder unchanged (flow control assertions)
+**2. `integration: /start-task branch context` — completes start → work → finish**
+
+```ts
+appendUserMessage('main work');
+appendAssistantMessage('working...');
+await runPushTask('Quick fix.', 'branch');
+await runStartTask();
+// Branch context: stays on current branch, history includes prior messages
+assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
+assert.ok(isLlmTriggered());
+
+appendAssistantMessage('Fixed the bug.');
+await runFinishTask();
+// Navigated back + branch result injected (prior task-branch messages not visible)
+assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
+assert.ok(isLlmTriggered());
+```
+
+**3. `integration: /auto fresh context` — completes push-task → auto → finish**
+
+```ts
+appendUserMessage('main work');
+appendAssistantMessage('working on main...');
+await runPushTask('Analyze performance.');
+
+const running = runAuto();
+await flushMicrotasks();
+await releaseNextIdle();
+// Auto ran start-task: fresh navigation, only task prompt visible
+assert.deepStrictEqual(getLlmHistory(), ['Analyze performance.']);
+
+appendAssistantMessage('Found 3 bottlenecks: ...');
+await releaseNextIdle();
+await releaseNextIdle();
+await running;
+// Auto ran finish-task: navigated back + branch result
+assert.deepStrictEqual(getLlmHistory(), [
+  'main work',
+  'working on main...',
+  'Found 3 bottlenecks: ...',
+]);
+assert.ok(isLlmTriggered());
+assert.ok(getLastNotification()?.includes('Task finished'));
+```
+
+**4. `integration: /auto branch context` — returns branch result to original leaf**
+
+```ts
+appendUserMessage('main work');
+appendAssistantMessage('working...');
+await runPushTask('Quick fix.', 'branch');
+
+const running = runAuto();
+await flushMicrotasks();
+await releaseNextIdle();
+assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Quick fix.']);
+
+appendAssistantMessage('Fixed the bug.');
+await releaseNextIdle();
+await releaseNextIdle();
+await running;
+assert.deepStrictEqual(getLlmHistory(), ['main work', 'working...', 'Fixed the bug.']);
+assert.ok(isLlmTriggered());
+```
+
+**5. `integration: /auto branch context` — stops when navigation is cancelled**
+
+```ts
+appendUserMessage('main work');
+await runPushTask('Analyze performance.');
+setCancelNextNav(true);
+
+const running = runAuto();
+await flushMicrotasks();
+await releaseNextIdle();
+await running;
+// Navigation cancelled: no messages added, history unchanged
+assert.ok(!isLlmTriggered());
+assert.deepStrictEqual(getLlmHistory(), ['main work']);
+```
+
+**6. `createAutoCommand` — waits when started with no task, then starts after push**
+
+```ts
+const running = runAuto();
+await flushMicrotasks();
+await releaseNextIdle();
+// Auto is waiting — no task yet
+
+await runPushTask('Review spec.');
+await releaseNextIdle();
+// Auto picked up the task, sent user message
+assert.deepStrictEqual(getLlmHistory(), ['Review spec.']);
+
+appendAssistantMessage('Done.');
+await releaseNextIdle();
+await releaseNextIdle();
+await running;
+```
+
+**7. `createAutoCommand` — warns when /auto is already running**
+
+```ts
+const firstRun = runAuto();
+await flushMicrotasks();
+
+await runAuto();
+assert.strictEqual(getLastNotification(), 'Auto is already running.');
+
+await emitSessionShutdown();
+await releaseNextIdle();
+await firstRun;
+```
+
+**8. `createAutoCommand` — keeps waiting while follow-up work is pending**
+
+```ts
+appendUserMessage('start');
+await runPushTask('Quick fix.', 'branch');
+await runStartTask();
+appendAssistantMessage('Fixed the bug.');
+
+let resolved = false;
+const running = runAuto().then(() => { resolved = true; });
+
+await flushMicrotasks();
+setPendingMessages(true);
+await releaseNextIdle();
+await releaseNextIdle();
+// Finish happened but pending messages prevent auto from stopping
+assert.ok(isLlmTriggered());
+assert.strictEqual(resolved, false);
+
+setPendingMessages(false);
+await releaseNextIdle();
+await running;
+assert.strictEqual(resolved, true);
+```
 
 ## Files changed
 
-- `index.test.ts` — harness rewrite + all tests rewritten
+- `index.test.ts` — harness rewrite + tests rewritten + 2 new tests
 - `index.ts` — no changes
 
 ## Things intentionally not covered
 
-- `discardTask` / `abortTask` have no tests (pre-existing, out of scope)
-- `lastAssistantWasAborted` logic untested after its test is removed (low-value edge case; the function remains in production code)
-- Notification type (`info`/`warning`) not distinguished in `getLastNotification()` — message text alone suffices for current test scenarios
+- `lastAssistantWasAborted` logic untested after test removal (low-value edge case; function remains in production code)
+- Notification type (`info`/`warning`) not distinguished in `getLastNotification()` — message text alone suffices
