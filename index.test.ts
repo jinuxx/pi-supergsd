@@ -152,6 +152,32 @@ describe('integration: /auto branch context', () => {
   });
 });
 
+// ── Registration ─────────────────────────────────────────────────
+
+describe('registration', () => {
+  it('registers the push-task tool and all five task commands', () => {
+    const registered: Array<{ type: string; name: string; description?: string }> = [];
+    const pi = {
+      registerTool: (tool: { name: string; label: string; description: string }) =>
+        registered.push({ type: 'tool', name: tool.name, description: tool.description }),
+      registerCommand: (name: string, opts: { description: string }) =>
+        registered.push({ type: 'command', name, description: opts.description }),
+      on: () => {},
+    } as unknown as ExtensionAPI;
+
+    registerTaskCommands(pi);
+
+    assert.deepStrictEqual(registered, [
+      { type: 'tool', name: 'push-task', description: 'Store a task prompt for a user-started navigation branch.' },
+      { type: 'command', name: 'start-task', description: 'Navigate to a fresh context and inject the active task prompt' },
+      { type: 'command', name: 'discard-task', description: 'Discard the active task without executing it' },
+      { type: 'command', name: 'finish-task', description: 'Finish the current task and return to the task start point' },
+      { type: 'command', name: 'abort-task', description: 'Abort the current task without finishing' },
+      { type: 'command', name: 'auto', description: 'Automatically run pushed task branches' },
+    ]);
+  });
+});
+
 // ── discardTask ──────────────────────────────────────────────────
 
 describe('discardTask', () => {
@@ -236,7 +262,26 @@ describe('createAutoCommand', () => {
     await firstRun;
   });
 
+  it('stops when the last assistant message was aborted', async () => {
+    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, getLastHint, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
+      makeHarness();
 
+    appendUserMessage('start');
+    await runPushTask('Implement phase 1.', 'branch');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
+    await runStartTask();
+    assert.strictEqual(getLastHint(), undefined);
+
+    appendAssistantMessage('Stopped by user.', 'aborted');
+
+    const running = runAuto();
+
+    await flushMicrotasks();
+    await releaseNextIdle();
+    await running;
+    assert.ok(!isLlmTriggered());
+  });
 
   it('keeps waiting while follow-up work is pending after finishTask', async () => {
     const { appendUserMessage, appendAssistantMessage, isLlmTriggered, getLastHint, setPendingMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
@@ -278,7 +323,7 @@ function makeHarness() {
   const sessionShutdownHandlers: Array<() => unknown> = [];
   const triggeredCustomMessages = new Set<string>();
   const triggeredUserMessages = new Set<string>();
-  let hints: Array<{ text: string }> = [];
+  const hints: Array<{ text: string }> = [];
   let cancelNextNav = false;
   let pendingMessages = false;
 
@@ -360,20 +405,21 @@ function makeHarness() {
     sm.appendMessage({ role: 'user', content: text, timestamp: 0 });
   }
 
-  function appendAssistantMessage(text: string): void {
+  function appendAssistantMessage(text: string, stopReason?: string): void {
     sm.appendMessage({
       role: 'assistant',
       content: [{ type: 'text', text }],
       timestamp: 0,
       model: 'test',
       provider: 'test',
+      ...(stopReason ? { stopReason } : {}),
     } as Parameters<typeof sm.appendMessage>[0]);
   }
 
   function getLastHint(): string | undefined {
     if (hints.length === 0) return undefined;
     const last = hints[hints.length - 1];
-    hints = [];
+    hints.length = 0;
     return last.text;
   }
 
