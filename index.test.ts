@@ -197,6 +197,24 @@ function getActiveTask(sm: SessionManager): TaskShape | null {
 
 interface TaskShape { prompt: string; context?: string }
 
+// ── discardTask ──────────────────────────────────────────────────
+
+describe('discardTask', () => {
+  it('discards a pending task without triggering the LLM', async () => {
+    const { appendUserMessage, getLlmHistory, isLlmTriggered, getLastHint, runPushTask, runDiscardTask } =
+      makeHarness();
+
+    appendUserMessage('main work');
+    await runPushTask('Quick fix.');
+    assert.strictEqual(getLastHint(), 'Task stored. Use `/start-task` or `/auto` to start it.');
+
+    await runDiscardTask();
+    assert.strictEqual(getLastHint(), 'Task discarded.');
+    assert.ok(!isLlmTriggered());
+    assert.deepStrictEqual(getLlmHistory(), ['main work']);
+  });
+});
+
 // ── createAutoCommand ────────────────────────────────────────────
 
 describe('createAutoCommand', () => {
