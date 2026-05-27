@@ -246,9 +246,8 @@ describe('createAutoCommand', () => {
   });
 
   it('warns and returns when /auto is already running', async () => {
-    const { pi, getLastHint, releaseNextIdle, flushMicrotasks, emitSessionShutdown, runAuto } =
+    const { getLastHint, releaseNextIdle, flushMicrotasks, emitSessionShutdown, runAuto } =
       makeHarness();
-    registerTaskCommands(pi);
 
     const firstRun = runAuto();
     await flushMicrotasks();
@@ -493,14 +492,14 @@ function makeHarness() {
     await handlerP;
   }
 
+  // Auto-register commands so the shutdown handler is set up
+  registerTaskCommands(pi);
+
   function runAuto(): Promise<void> {
     return createAutoCommand(pi).handler('', ctx) as Promise<void>;
   }
 
   return {
-    sm,
-    pi,
-    ctx,
     sentMessages,
     sentCustomMessages,
     notifications,
