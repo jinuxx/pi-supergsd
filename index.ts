@@ -8,6 +8,8 @@ import {
   type ToolDefinition,
 } from '@earendil-works/pi-coding-agent';
 
+import { Text } from '@earendil-works/pi-tui';
+
 import { Type } from 'typebox';
 
 export default function registerTaskCommands(pi: ExtensionAPI): void {
@@ -97,6 +99,38 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
       'Do not batch multiple push-task calls together, and do not mix push-task with other tool calls in the same turn.',
     ],
     parameters: pushTaskParameters,
+    renderCall(args, theme, context) {
+      const header = theme.fg('toolTitle', theme.bold('push-task'))
+        + (args.inherit_context ? ' ' + theme.fg('warning', '[inherit]') : '');
+
+      const promptLines = (args.prompt as string).split('\n');
+      const maxLines = context.expanded ? promptLines.length : 7;
+      const displayLines = promptLines.slice(0, maxLines)
+        .map(l => theme.fg('dim', l.trimEnd() || ' '));
+
+      if (!context.expanded && promptLines.length > 7) {
+        displayLines.push(theme.fg('muted', '...'));
+      }
+
+      return new Text([header, ...displayLines].join('\n'), 0, 0);
+    },
+    renderResult(result, { expanded }, theme, _context) {
+      const details = result.details as { prompt: string; inherit_context: boolean };
+
+      const header = theme.fg('toolTitle', theme.bold('push-task'))
+        + (details.inherit_context ? ' ' + theme.fg('warning', '[inherit]') : '');
+
+      const promptLines = details.prompt.split('\n');
+      const maxLines = expanded ? promptLines.length : 7;
+      const displayLines = promptLines.slice(0, maxLines)
+        .map(l => theme.fg('dim', l.trimEnd() || ' '));
+
+      if (!expanded && promptLines.length > 7) {
+        displayLines.push(theme.fg('muted', '...'));
+      }
+
+      return new Text([header, ...displayLines].join('\n'), 0, 0);
+    },
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       if (signal?.aborted) {
         throw new Error('Task storage aborted.');
