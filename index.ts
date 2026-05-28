@@ -293,22 +293,9 @@ async function finishTask(
     }
   }
 
-  // Compute slug from the task that started this branch
-  let slug: string | undefined;
-  const preNavBranch = ctx.sessionManager.getBranch();
-  let lookingForTask = false;
-  // Walk backward from the end (or from task-start's position) to find the task entry
-  for (let i = preNavBranch.length - 1; i >= 0; i--) {
-    const entry = preNavBranch[i];
-    if (entry.type === 'custom' && entry.customType === TASK_START_ENTRY_TYPE) {
-      lookingForTask = true;
-      continue;
-    }
-    if (lookingForTask && entry.type === 'custom' && entry.customType === TASK_ENTRY_TYPE) {
-      slug = makeSlug((entry.data as TaskData).prompt);
-      break;
-    }
-  }
+  // Find the task prompt on the current branch for the slug label
+  const taskPrompt = findTaskPrompt(ctx.sessionManager);
+  const slug = taskPrompt ? makeSlug(taskPrompt) : undefined;
 
   const result = await ctx.navigateTree(taskStart.data.returnTo, {
     summarize: false,
@@ -431,30 +418,51 @@ function updateTaskStatus(
     return;
   }
 
-  const current = currentTask(session);
-  if (current) {
-    // Walk forward from task-start to find the next user message
-    const branch = session.getBranch();
-    let found = false;
-    for (const entry of branch) {
-      if (found && entry.type === 'message' && entry.message.role === 'user') {
-        const prompt = typeof entry.message.content === 'string'
-          ? entry.message.content
-          : Array.isArray(entry.message.content)
-            ? entry.message.content.find((b): b is { type: 'text'; text: string } => b.type === 'text')?.text ?? ''
-            : '';
-        const slug = makeSlug(prompt);
-        setStatus('task', theme.fg('dim', `current task: ${slug}`));
-        return;
-      }
-      if (entry.type === 'custom' && entry.customType === TASK_START_ENTRY_TYPE) {
-        found = true;
-      }
+  if (currentTask(session)) {
+    const prompt = findTaskPrompt(session);
+    if (prompt) {
+      const slug = makeSlug(prompt);
+      setStatus('task', theme.fg('dim', `current task: ${slug}`));
     }
     return;
   }
 
   setStatus('task', undefined);
+}
+
+/**
+ * Find the user message content injected as the task prompt after the
+ * most recent TASK_START entry. Returns undefined if no task is active.
+ */
+function findTaskPrompt(session: ReadonlySessionLike): string | undefined {
+  const branch = session.getBranch();
+
+  // Walk backward to find the most recent TASK_START
+  let startIdx = -1;
+  for (let i = branch.length - 1; i >= 0; i--) {
+    const entry = branch[i];
+    if (entry.type === 'custom' && entry.customType === TASK_START_ENTRY_TYPE) {
+      startIdx = i;
+      break;
+    }
+  }
+  if (startIdx === -1) return undefined;
+
+  // Walk forward from TASK_START to find the next user message
+  for (let i = startIdx + 1; i < branch.length; i++) {
+    const entry = branch[i];
+    if (entry.type === 'message' && entry.message.role === 'user') {
+      if (typeof entry.message.content === 'string') return entry.message.content;
+      if (Array.isArray(entry.message.content)) {
+        const textBlock = entry.message.content.find(
+          (b): b is { type: 'text'; text: string } => b.type === 'text',
+        );
+        return textBlock?.text;
+      }
+      return undefined;
+    }
+  }
+  return undefined;
 }
 
 // ── Lookup utilities ──────────────────────────────────────────────
@@ -527,7 +535,7 @@ interface ReadonlySessionLike {
 function makeSlug(prompt: string): string {
   const words = prompt.split(/\s+/)
     .filter(w => !STOPWORDS.has(w.toLowerCase()))
-    .map(w => w.toLowerCase().replace(/[^\w\d]+$/, ''));
+    .map(w => w.toLowerCase().replace(/[^\w]+$/, ''));
   if (words.length === 0) return '<no description>';
 
   let result = words[0]!;
