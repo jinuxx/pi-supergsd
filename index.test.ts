@@ -194,7 +194,7 @@ describe('manual workflow', () => {
     );
   });
 
-  it('handles multiple stacked tasks — both fresh context (LIFO)', async () => {
+  it('handles multiple stacked tasks - both fresh context (LIFO)', async () => {
     const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
         makeHarness();
 
@@ -265,7 +265,7 @@ describe('manual workflow', () => {
     );
   });
 
-  it('handles multiple stacked tasks — fresh then inherited context', async () => {
+  it('handles multiple stacked tasks - fresh then inherited context', async () => {
     const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
         makeHarness();
 
@@ -338,7 +338,7 @@ describe('manual workflow', () => {
     );
   });
 
-  it('handles multiple stacked tasks — inherited then fresh context', async () => {
+  it('handles multiple stacked tasks - inherited then fresh context', async () => {
     const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
         makeHarness();
 
@@ -412,7 +412,7 @@ describe('manual workflow', () => {
     );
   });
 
-  it('handles multiple stacked tasks — both inherited context', async () => {
+  it('handles multiple stacked tasks - both inherited context', async () => {
     const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
         makeHarness();
 
