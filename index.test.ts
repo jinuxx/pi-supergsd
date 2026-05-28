@@ -18,6 +18,54 @@ import registerTaskCommands, {
   createAutoCommand,
 } from './index.js';
 
+// ── pathSuite test helper ───────────────────────────────────────
+
+interface PathNode {
+  name: string;
+  fn?: (h: ReturnType<typeof makeHarness>) => Promise<void> | void;
+  children: PathNode[];
+}
+
+type PathFn = (
+  name: string,
+  fn?: (h: ReturnType<typeof makeHarness>) => Promise<void> | void,
+  ...children: PathNode[]
+) => PathNode;
+
+const path: PathFn = (name, fn, ...children) => ({ name, fn, children });
+
+function pathSuite(
+  description: string,
+  fn: (path: PathFn) => PathNode | PathNode[],
+): void {
+  describe(description, () => {
+    const roots = fn(path);
+    const rootsArray = Array.isArray(roots) ? roots : [roots];
+
+    function registerTests(node: PathNode, ancestors: PathNode[]): void {
+      const chain = [...ancestors, node];
+      const name = chain.map(n => n.name).join(' → ');
+
+      it(name, async () => {
+        const h = makeHarness();
+        for (const ancestor of chain) {
+          if (ancestor.fn) {
+            await ancestor.fn(h);
+          }
+        }
+      });
+
+      for (const child of node.children) {
+        registerTests(child, chain);
+      }
+    }
+
+    for (const root of rootsArray) {
+      registerTests(root, []);
+    }
+  });
+}
+
 describe('manual workflow', () => {
   it('completes /start-task → work → /finish-task with last-response injection', async () => {
     const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
@@ -1555,6 +1603,43 @@ describe('registration', () => {
     ]);
   });
 });
+
+describe('pathSuite', () => {
+  it('builds a correct path tree', () => {
+    const tree = path('A', async () => {},
+      path('B', async () => {},
+        path('C', async () => {}),
+        path('D', async () => {}),
+      ),
+      path('E', async () => {}),
+    );
+
+    assert.strictEqual(tree.name, 'A');
+    assert.strictEqual(tree.children.length, 2);
+    assert.strictEqual(tree.children[0].name, 'B');
+    assert.strictEqual(tree.children[0].children.length, 2);
+    assert.strictEqual(tree.children[0].children[0].name, 'C');
+    assert.strictEqual(tree.children[0].children[1].name, 'D');
+    assert.strictEqual(tree.children[1].name, 'E');
+    assert.strictEqual(tree.children[1].children.length, 0);
+  });
+});
+
+// ── pathSuite integration: generates live it() tests ─────────────
+
+pathSuite('pathSuite integration', (path) =>
+  path('A', (h) => {
+    assert.ok(typeof h.assertBranchHistory === 'function', 'harness has assertBranchHistory');
+  },
+    path('B', (h) => {
+      assert.ok(typeof h.assertBranchHistory === 'function', 'harness has assertBranchHistory');
+    },
+      path('C', (h) => {
+        assert.ok(typeof h.assertBranchHistory === 'function', 'harness has assertBranchHistory');
+      }),
+    ),
+  )
+);
 
 const assistant = (content: string) => ({
   type: 'message' as const,
