@@ -18,7 +18,7 @@ import registerTaskCommands, {
   createAutoCommand,
 } from './index.js';
 
-// ── Integration: /start-task ─────────────────────────────────────
+// ── Integration: manual execution ─────────────────────────────────────
 
 describe('integration: /start-task fresh context', () => {
   it('completes /start-task → work → /finish-task with last-response injection', async () => {
@@ -97,6 +97,54 @@ describe('integration: /start-task branch context', () => {
       notification('Task finished. Last response attached.'),
     );
     assert.ok(isLlmTriggered());
+  });
+});
+
+describe('discardTask', () => {
+  it('discards a pending task without triggering the LLM', async () => {
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runDiscardTask } =
+        makeHarness();
+
+    appendUserMessage('main work');
+    appendAssistantMessage('working...');
+    await runPushTask('Quick fix.');
+
+    await runDiscardTask();
+    assert.ok(!isLlmTriggered());
+    assert.strictEqual(getStatus(), undefined);
+    assertBranchHistory(
+        user('main work'),
+        task('Quick fix.'),
+        notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+        notification('Task discarded.'),
+    );
+  });
+});
+
+describe('abortTask', () => {
+  it('aborts an in-progress task and returns to the original branch', async () => {
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runAbortTask } =
+        makeHarness();
+
+    appendUserMessage('main work');
+    appendAssistantMessage('working...');
+    await runPushTask('Quick fix.', true);
+
+    await runStartTask();
+    assert.ok(isLlmTriggered());
+
+    appendAssistantMessage('Partial work...');
+
+    await runAbortTask();
+    assert.strictEqual(getStatus(), undefined);
+    assert.ok(!isLlmTriggered());
+    assertBranchHistory(
+        user('main work'),
+        assistant('working...'),
+        task('Quick fix.', true),
+        notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+        notification('Task aborted. Branch abandoned without summary.'),
+    );
   });
 });
 
@@ -234,57 +282,6 @@ describe('registration', () => {
       { type: 'command', name: 'abort-task', description: 'Abort the current task without finishing' },
       { type: 'command', name: 'auto', description: 'Automatically run pushed task branches' },
     ]);
-  });
-});
-
-// ── discardTask ──────────────────────────────────────────────────
-
-describe('discardTask', () => {
-  it('discards a pending task without triggering the LLM', async () => {
-    const { appendUserMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runDiscardTask } =
-      makeHarness();
-
-    appendUserMessage('main work');
-    await runPushTask('Quick fix.');
-
-    await runDiscardTask();
-    assert.strictEqual(getStatus(), undefined);
-    assert.ok(!isLlmTriggered());
-    assertBranchHistory(
-      user('main work'),
-      task('Quick fix.'),
-      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
-      notification('Task discarded.'),
-    );
-  });
-});
-
-// ── abortTask ───────────────────────────────────────────────────
-
-describe('abortTask', () => {
-  it('aborts an in-progress task and returns to the original branch', async () => {
-    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runAbortTask } =
-      makeHarness();
-
-    appendUserMessage('main work');
-    appendAssistantMessage('working...');
-    await runPushTask('Quick fix.', true);
-
-    await runStartTask();
-    assert.ok(isLlmTriggered());
-
-    appendAssistantMessage('Partial work...');
-
-    await runAbortTask();
-    assert.strictEqual(getStatus(), undefined);
-    assert.ok(!isLlmTriggered());
-    assertBranchHistory(
-      user('main work'),
-      assistant('working...'),
-      task('Quick fix.', true),
-      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
-      notification('Task aborted. Branch abandoned without summary.'),
-    );
   });
 });
 
