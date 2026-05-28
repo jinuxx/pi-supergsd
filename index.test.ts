@@ -150,6 +150,49 @@ describe('manual workflow', () => {
         assistant('Full work'),
     );
   });
+
+  it('aborts an in-progress task with inherited context and keeps the task pending for re-execution', async () => {
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runAbortTask } =
+        makeHarness();
+
+    appendUserMessage('main work');
+    appendAssistantMessage('working...');
+    await runPushTask('Quick fix.', true);
+    assert.strictEqual(getStatus(), 'pending task: quick-fix');
+
+    // Start task with inherited context — preserves the chain
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: quick-fix');
+    assert.ok(isLlmTriggered());
+
+    appendAssistantMessage('Partial work...');
+
+    // Abort — navigates back to returnTo, task re-pending
+    await runAbortTask();
+    assert.strictEqual(getStatus(), 'pending task: quick-fix');
+    assert.ok(!isLlmTriggered());
+    assertBranchHistory(
+      user('main work'),
+      assistant('working...'),
+      task('Quick fix.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+      notification('Task aborted. Branch abandoned without summary.'),
+    );
+
+    // Re-start with inherited context (from the stored task entry)
+    await runStartTask();
+    assert.ok(isLlmTriggered());
+    appendAssistantMessage('Full work');
+    assert.strictEqual(getStatus(), 'current task: quick-fix');
+    assert.ok(!isLlmTriggered());
+    assertBranchHistory(
+      user('main work'),
+      assistant('working...'),
+      task('Quick fix.', true),
+      user('Quick fix.'),
+      assistant('Full work'),
+    );
+  });
 });
 
 describe('automated workflow', () => {
