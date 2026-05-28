@@ -6,7 +6,6 @@ import {
   SessionManager,
   type ExtensionAPI,
   type ExtensionCommandContext,
-  buildSessionContext,
   type Theme,
 } from '@earendil-works/pi-coding-agent';
 
@@ -18,44 +17,6 @@ import registerTaskCommands, {
   createDiscardTaskCommand,
   createAutoCommand,
 } from './index.js';
-
-// ── Branch history helpers ──────────────────────────────────────
-
-type NotificationEntry = {
-  type: 'notification';
-  text: string;
-  afterEntryId: string | null;
-};
-
-type BranchEntry = import('@earendil-works/pi-coding-agent').SessionEntry | NotificationEntry;
-
-const user = (content: string) => ({
-  type: 'message' as const,
-  message: { role: 'user' as const, content }
-}) as unknown as Partial<BranchEntry>;
-
-const assistant = (content: string) => ({
-  type: 'message' as const,
-  message: { role: 'assistant' as const, content: [{ type: 'text' as const, text: content }] }
-}) as unknown as Partial<BranchEntry>;
-
-const task = (prompt: string, inherit_context = false) => ({
-  type: 'custom' as const,
-  customType: 'task',
-  data: { prompt, inherit_context }
-}) as unknown as Partial<BranchEntry>;
-
-const taskResult = (slug: string) => ({
-  type: 'custom_message' as const,
-  customType: 'task-result',
-  details: { slug }
-}) as unknown as Partial<BranchEntry>;
-
-const notification = (text: string) => ({
-  type: 'notification' as const,
-  text,
-  afterEntryId: null as string | null
-}) as unknown as Partial<BranchEntry>;
 
 // ── Integration: /start-task ─────────────────────────────────────
 
@@ -333,6 +294,11 @@ describe('abortTask', () => {
   });
 });
 
+const assistant = (content: string) => ({
+  type: 'message' as const,
+  message: { role: 'assistant' as const, content: [{ type: 'text' as const, text: content }] }
+}) as unknown as Partial<BranchEntry>;
+
 // ── createAutoCommand ────────────────────────────────────────────
 
 describe('createAutoCommand', () => {
@@ -398,7 +364,7 @@ describe('createAutoCommand', () => {
   });
 
   it('keeps waiting while follow-up work is pending after finishTask', async () => {
-    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, setPendingMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
+    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, setPendingMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, runAuto } =
       makeHarness();
 
     appendUserMessage('start');
@@ -427,6 +393,17 @@ describe('createAutoCommand', () => {
   });
 });
 
+const user = (content: string) => ({
+  type: 'message' as const,
+  message: { role: 'user' as const, content }
+}) as unknown as Partial<BranchEntry>;
+
+const task = (prompt: string, inherit_context = false) => ({
+  type: 'custom' as const,
+  customType: 'task',
+  data: { prompt, inherit_context }
+}) as unknown as Partial<BranchEntry>;
+
 // ── Test harness ─────────────────────────────────────────────────
 
 function makeHarness() {
@@ -440,7 +417,7 @@ function makeHarness() {
   let cancelNextNav = false;
   let pendingMessages = false;
   let taskStatus: string | undefined;
-  let lastTaskResultDetails: { slug?: string; sourceEntryId?: string } | undefined;
+
 
   const pi = {
     appendEntry(customType: string, data?: unknown) {
@@ -463,9 +440,7 @@ function makeHarness() {
         message.display ?? true,
         message.details,
       );
-      if (message.customType === 'task-result') {
-        lastTaskResultDetails = message.details as { slug?: string; sourceEntryId?: string } | undefined;
-      }
+
       if (options?.triggerTurn) {
         const branch = sm.getBranch();
         const last = branch[branch.length - 1];
@@ -562,7 +537,7 @@ function makeHarness() {
 
       if (!isSkipped) {
         // Strip IDs, internal fields, display, and content for comparison
-        const { id, parentId, timestamp, display, content, data: rawData, details: rawDetails, ...restEntry } = entry as unknown as Record<string, unknown>;
+        const { id: _id, parentId: _pid, timestamp: _ts, display: _dp, content: _ct, data: rawData, details: rawDetails, ...restEntry } = entry as unknown as Record<string, unknown>;
 
         // Build stripped version excluding fields we always strip
         const stripped: Record<string, unknown> = { ...restEntry };
@@ -626,20 +601,7 @@ function makeHarness() {
     assert.deepStrictEqual(actual, expected);
   }
 
-  function getLlmHistory(): string[] {
-    const ctx = buildSessionContext(sm.getEntries(), sm.getLeafId());
-    return ctx.messages.map(m => {
-      const msg = m as { content?: string | Array<{ type: string; text?: string }> };
-      if (typeof msg.content === 'string') return msg.content;
-      if (!Array.isArray(msg.content)) return '';
-      return msg.content
-        .filter((b): b is { type: 'text'; text: string } =>
-          typeof b === 'object' && b !== null && 'type' in b && b.type === 'text'
-        )
-        .map(b => b.text ?? '')
-        .join('');
-    });
-  }
+
 
   async function releaseNextIdle() {
     const next = idleWaiters.shift();
@@ -699,17 +661,13 @@ function makeHarness() {
     return taskStatus;
   }
 
-  function getLastTaskResultDetails() {
-    return lastTaskResultDetails;
-  }
+
 
   return {
     assertBranchHistory,
-    getLlmHistory,
     isLlmTriggered,
     getLastHint,
     getStatus,
-    getLastTaskResultDetails,
     appendUserMessage,
     appendAssistantMessage,
     releaseNextIdle,
@@ -726,3 +684,18 @@ function makeHarness() {
   };
 }
 
+const notification = (text: string) => ({
+  type: 'notification' as const,
+  text,
+  afterEntryId: null as string | null
+}) as unknown as Partial<BranchEntry>;
+
+type BranchEntry = import('@earendil-works/pi-coding-agent').SessionEntry | NotificationEntry;
+
+// ── Branch history helpers ──────────────────────────────────────
+
+type NotificationEntry = {
+  type: 'notification';
+  text: string;
+  afterEntryId: string | null;
+};
