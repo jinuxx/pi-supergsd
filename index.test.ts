@@ -18,8 +18,6 @@ import registerTaskCommands, {
   createAutoCommand,
 } from './index.js';
 
-// ── Integration: manual workflow ─────────────────────────────────
-
 describe('manual workflow', () => {
   it('completes /start-task → work → /finish-task with last-response injection', async () => {
     const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
@@ -153,8 +151,6 @@ describe('manual workflow', () => {
     );
   });
 });
-
-// ── Integration: automated workflow ──────────────────────────────
 
 describe('automated workflow', () => {
   it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {

@@ -1,4 +1,4 @@
-# Manual workflow tests — recursive & multi-queue coverage
+# Manual workflow tests — recursive & multi-task coverage
 
 ## Motivation
 
@@ -6,7 +6,7 @@ The manual workflow test suite currently has 4 tests covering basic push/start/f
 
 - **Aborting with inherited context** (only fresh-context abort is tested)
 - **Recursive/nested tasks** — pushing a task from within an active task
-- **Multiple queued tasks** — pushing several tasks upfront then consuming them sequentially
+- **Multiple stacked tasks** — pushing several tasks upfront then consuming them sequentially (LIFO: most recent first)
 
 These are valid real-world patterns. The task lookup functions (`pendingTask`, `currentTask`) walk backward through branch entries and already handle nesting via skip counters, but this is untested.
 
@@ -60,7 +60,7 @@ pushTask('Inner task.', <inner_ctx>)     → pending task: inner-task
 
 - **abort → finish (2c*):** `startTask()` → assistant("partial inner") → `abortTask()` → (inner task pending again, outer still current) → assistant("outer done") → `finishTask()` → (task-result injected at root)
 
-### 3. Multiple queued tasks — 4 tests
+### 3. Multiple stacked tasks — 4 tests
 
 | # | Task 1 ctx | Task 2 ctx | Flow |
 |---|-----------|-----------|------|
@@ -73,12 +73,12 @@ pushTask('Inner task.', <inner_ctx>)     → pending task: inner-task
 appendUserMessage('main')
 appendAssistantMessage('working...')
 pushTask('Task one.', <ctx1>)        → pending task: task-one
-pushTask('Task two.', <ctx2>)        → pending task: task-one (second push is queued behind)
-startTask()                          → current task: task-one
-assistant("one done")
-finishTask()                         → task-result injected, pending task: task-two
+pushTask('Task two.', <ctx2>)        → pending task: task-two (most recent, LIFO)
 startTask()                          → current task: task-two
 assistant("two done")
+finishTask()                         → task-result injected, pending task: task-one
+startTask()                          → current task: task-one
+assistant("one done")
 finishTask()                         → task-result injected, status cleared
 ```
 
