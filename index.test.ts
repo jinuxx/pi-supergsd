@@ -489,6 +489,557 @@ describe('manual workflow', () => {
       notification('Task finished. Last response attached.'),
     );
   });
+
+  it('recursive finish→finish - fresh outer, fresh inner', async () => {
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
+      makeHarness();
+
+    // ── Push outer task (fresh context) on main branch ──
+    appendUserMessage('main');
+    appendAssistantMessage('working...');
+    await runPushTask('Outer task.');
+    assert.strictEqual(getStatus(), 'pending task: outer-task');
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    // ── Start outer task (fresh context — navigate to fresh branch) ──
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    // Fresh branch: only the task prompt user message
+    assertBranchHistory(
+      user('Outer task.'),
+    );
+
+    // ── Push inner task (fresh context) from within outer task ──
+    await runPushTask('Inner task.');
+    assert.strictEqual(getStatus(), 'pending task: inner-task');
+    assertBranchHistory(
+      user('Outer task.'),
+      task('Inner task.'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    // ── Start inner task (fresh context — navigate to fresh branch) ──
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: inner-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('Inner task.'),
+    );
+
+    // ── Work on inner task ──
+    appendAssistantMessage('inner done');
+
+    // ── Finish inner task → navigate back to outer task branch ──
+    await runFinishTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('Outer task.'),
+      task('Inner task.'),
+      taskResult('inner-task', 'inner done'),
+      notification('Task finished. Last response attached.'),
+    );
+
+    // ── Work on outer task ──
+    appendAssistantMessage('outer done');
+
+    // ── Finish outer task → navigate back to main branch ──
+    await runFinishTask();
+    assert.strictEqual(getStatus(), undefined);
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.'),
+      taskResult('outer-task', 'outer done'),
+      notification('Task finished. Last response attached.'),
+    );
+  });
+
+  it('recursive finish→finish - fresh outer, inherited inner', async () => {
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
+      makeHarness();
+
+    // ── Push outer task (fresh) on main ──
+    appendUserMessage('main');
+    appendAssistantMessage('working...');
+    await runPushTask('Outer task.');
+    assert.strictEqual(getStatus(), 'pending task: outer-task');
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    // ── Start outer task (fresh) ──
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('Outer task.'),
+    );
+
+    // ── Push inner task (inherited) from within outer task ──
+    await runPushTask('Inner task.', true);
+    assert.strictEqual(getStatus(), 'pending task: inner-task');
+    assertBranchHistory(
+      user('Outer task.'),
+      task('Inner task.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    // ── Start inner task (inherited — no navigation) ──
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: inner-task');
+    assert.ok(isLlmTriggered());
+    // Inherited: prior context preserved on same branch
+    assertBranchHistory(
+      user('Outer task.'),
+      task('Inner task.', true),
+      user('Inner task.'),
+    );
+
+    // ── Work on inner task ──
+    appendAssistantMessage('inner done');
+
+    // ── Finish inner task → navigate back to outer task branch ──
+    await runFinishTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('Outer task.'),
+      task('Inner task.', true),
+      taskResult('inner-task', 'inner done'),
+      notification('Task finished. Last response attached.'),
+    );
+
+    // ── Work on outer task ──
+    appendAssistantMessage('outer done');
+
+    // ── Finish outer task → navigate back to main ──
+    await runFinishTask();
+    assert.strictEqual(getStatus(), undefined);
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.'),
+      taskResult('outer-task', 'outer done'),
+      notification('Task finished. Last response attached.'),
+    );
+  });
+
+  it('recursive finish→finish - inherited outer, fresh inner', async () => {
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
+      makeHarness();
+
+    // ── Push outer task (inherited) on main ──
+    appendUserMessage('main');
+    appendAssistantMessage('working...');
+    await runPushTask('Outer task.', true);
+    assert.strictEqual(getStatus(), 'pending task: outer-task');
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    // ── Start outer task (inherited — no navigation) ──
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      user('Outer task.'),
+    );
+
+    // ── Push inner task (fresh) from within outer task ──
+    await runPushTask('Inner task.');
+    assert.strictEqual(getStatus(), 'pending task: inner-task');
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      user('Outer task.'),
+      task('Inner task.'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    // ── Start inner task (fresh — navigate to fresh branch) ──
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: inner-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('Inner task.'),
+    );
+
+    // ── Work on inner task ──
+    appendAssistantMessage('inner done');
+
+    // ── Finish inner task → navigate back to returnTo on main branch ──
+    await runFinishTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      user('Outer task.'),
+      task('Inner task.'),
+      taskResult('inner-task', 'inner done'),
+      notification('Task finished. Last response attached.'),
+    );
+
+    // ── Work on outer task ──
+    appendAssistantMessage('outer done');
+
+    // ── Finish outer task → navigate back to returnTo on main ──
+    await runFinishTask();
+    assert.strictEqual(getStatus(), undefined);
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      taskResult('outer-task', 'outer done'),
+      notification('Task finished. Last response attached.'),
+    );
+  });
+
+  it('recursive finish→finish - inherited outer, inherited inner', async () => {
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask } =
+      makeHarness();
+
+    // ── Push outer task (inherited) on main ──
+    appendUserMessage('main');
+    appendAssistantMessage('working...');
+    await runPushTask('Outer task.', true);
+    assert.strictEqual(getStatus(), 'pending task: outer-task');
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    // ── Start outer task (inherited — no navigation) ──
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      user('Outer task.'),
+    );
+
+    // ── Push inner task (inherited) from within outer task ──
+    await runPushTask('Inner task.', true);
+    assert.strictEqual(getStatus(), 'pending task: inner-task');
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      user('Outer task.'),
+      task('Inner task.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    // ── Start inner task (inherited — no navigation) ──
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: inner-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      user('Outer task.'),
+      task('Inner task.', true),
+      user('Inner task.'),
+    );
+
+    // ── Work on inner task ──
+    appendAssistantMessage('inner done');
+
+    // ── Finish inner task → navigate back to returnTo ──
+    await runFinishTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      user('Outer task.'),
+      task('Inner task.', true),
+      taskResult('inner-task', 'inner done'),
+      notification('Task finished. Last response attached.'),
+    );
+
+    // ── Work on outer task ──
+    appendAssistantMessage('outer done');
+
+    // ── Finish outer task → navigate back to returnTo ──
+    await runFinishTask();
+    assert.strictEqual(getStatus(), undefined);
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      taskResult('outer-task', 'outer done'),
+      notification('Task finished. Last response attached.'),
+    );
+  });
+
+  it('recursive discard→finish - fresh outer, fresh inner', async () => {
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask, runDiscardTask } =
+      makeHarness();
+
+    // ── Push outer task (fresh context) on main branch ──
+    appendUserMessage('main');
+    appendAssistantMessage('working...');
+    await runPushTask('Outer task.');
+    assert.strictEqual(getStatus(), 'pending task: outer-task');
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    // ── Start outer task (fresh context — navigate to fresh branch) ──
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('Outer task.'),
+    );
+
+    // ── Push inner task (fresh context) from within outer task ──
+    await runPushTask('Inner task.');
+    assert.strictEqual(getStatus(), 'pending task: inner-task');
+    assertBranchHistory(
+      user('Outer task.'),
+      task('Inner task.'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    // ── Discard inner task (no navigation, outer task still pending) ──
+    await runDiscardTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    // Outer task's user message is still pending, so llm is triggered
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('Outer task.'),
+      task('Inner task.'),
+      notification('Task discarded.'),
+    );
+
+    // ── Work on outer task ──
+    appendAssistantMessage('outer done');
+
+    // ── Finish outer task → navigate back to main ──
+    await runFinishTask();
+    assert.strictEqual(getStatus(), undefined);
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.'),
+      taskResult('outer-task', 'outer done'),
+      notification('Task finished. Last response attached.'),
+    );
+  });
+
+  it('recursive discard→finish - fresh outer, inherited inner', async () => {
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask, runDiscardTask } =
+      makeHarness();
+
+    appendUserMessage('main');
+    appendAssistantMessage('working...');
+    await runPushTask('Outer task.');
+    assert.strictEqual(getStatus(), 'pending task: outer-task');
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('Outer task.'),
+    );
+
+    // ── Push inner task with inherited context ──
+    await runPushTask('Inner task.', true);
+    assert.strictEqual(getStatus(), 'pending task: inner-task');
+    assertBranchHistory(
+      user('Outer task.'),
+      task('Inner task.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    await runDiscardTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('Outer task.'),
+      task('Inner task.', true),
+      notification('Task discarded.'),
+    );
+
+    appendAssistantMessage('outer done');
+
+    await runFinishTask();
+    assert.strictEqual(getStatus(), undefined);
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.'),
+      taskResult('outer-task', 'outer done'),
+      notification('Task finished. Last response attached.'),
+    );
+  });
+
+  it('recursive discard→finish - inherited outer, fresh inner', async () => {
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask, runDiscardTask } =
+      makeHarness();
+
+    appendUserMessage('main');
+    appendAssistantMessage('working...');
+    await runPushTask('Outer task.', true);
+    assert.strictEqual(getStatus(), 'pending task: outer-task');
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    // Inherited: prior context preserved
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      user('Outer task.'),
+    );
+
+    // ── Push inner task (fresh context) from within outer task ──
+    await runPushTask('Inner task.');
+    assert.strictEqual(getStatus(), 'pending task: inner-task');
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      user('Outer task.'),
+      task('Inner task.'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    await runDiscardTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      user('Outer task.'),
+      task('Inner task.'),
+      notification('Task discarded.'),
+    );
+
+    appendAssistantMessage('outer done');
+
+    await runFinishTask();
+    assert.strictEqual(getStatus(), undefined);
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      taskResult('outer-task', 'outer done'),
+      notification('Task finished. Last response attached.'),
+    );
+  });
+
+  it('recursive discard→finish - inherited outer, inherited inner', async () => {
+    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, runPushTask, runStartTask, runFinishTask, runDiscardTask } =
+      makeHarness();
+
+    appendUserMessage('main');
+    appendAssistantMessage('working...');
+    await runPushTask('Outer task.', true);
+    assert.strictEqual(getStatus(), 'pending task: outer-task');
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    await runStartTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      user('Outer task.'),
+    );
+
+    await runPushTask('Inner task.', true);
+    assert.strictEqual(getStatus(), 'pending task: inner-task');
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      user('Outer task.'),
+      task('Inner task.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+    );
+
+    await runDiscardTask();
+    assert.strictEqual(getStatus(), 'current task: outer-task');
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      user('Outer task.'),
+      task('Inner task.', true),
+      notification('Task discarded.'),
+    );
+
+    appendAssistantMessage('outer done');
+
+    await runFinishTask();
+    assert.strictEqual(getStatus(), undefined);
+    assert.ok(isLlmTriggered());
+    assertBranchHistory(
+      user('main'),
+      assistant('working...'),
+      task('Outer task.', true),
+      taskResult('outer-task', 'outer done'),
+      notification('Task finished. Last response attached.'),
+    );
+  });
 });
 
 describe('automated workflow', () => {
