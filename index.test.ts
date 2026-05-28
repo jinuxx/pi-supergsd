@@ -40,7 +40,6 @@ describe('integration: /start-task fresh context', () => {
     assert.strictEqual(getStatus(), 'current task: analyze-performance');
     assertBranchHistory(
       user('main work'),
-      { type: 'custom', customType: 'task-start' },
       user('Analyze performance.'),
     );
     assert.ok(isLlmTriggered());
@@ -83,7 +82,6 @@ describe('integration: /start-task branch context', () => {
       user('main work'),
       assistant('working...'),
       task('Quick fix.', true),
-      { type: 'custom', customType: 'task-start' },
       user('Quick fix.'),
     );
     assert.ok(isLlmTriggered());
@@ -128,7 +126,6 @@ describe('integration: /auto fresh context', () => {
     // Auto started the task (fresh context)
     assertBranchHistory(
       user('main work'),
-      { type: 'custom', customType: 'task-start' },
       user('Analyze performance.'),
     );
 
@@ -173,7 +170,6 @@ describe('integration: /auto branch context', () => {
       user('main work'),
       assistant('working...'),
       task('Quick fix.', true),
-      { type: 'custom', customType: 'task-start' },
       user('Quick fix.'),
     );
 
@@ -318,7 +314,6 @@ describe('createAutoCommand', () => {
     assertBranchHistory(
       task('Review spec.'),
       notification('Task stored. Use `/start-task` or `/auto` to start it.'),
-      { type: 'custom', customType: 'task-start' },
       user('Review spec.'),
     );
 
@@ -531,7 +526,7 @@ function makeHarness() {
     const consumedHints = new Set<number>();
 
     for (const entry of entries) {
-      const isSkipped = entry.type === 'custom' && entry.customType === 'task-done';
+      const isSkipped = entry.type === 'custom' && (entry.customType === 'task-done' || entry.customType === 'task-start');
 
       if (!isSkipped) {
         // Strip IDs, internal fields, display, and content for comparison
