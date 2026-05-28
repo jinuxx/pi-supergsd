@@ -34,16 +34,16 @@ Queues a task with `inherit_context` defaulting to `false` (fresh session). Set 
 
 ## Use cases
 
-### Review with in-branch fixes
+### Review with fresh context
 
-The LLM queues a review after implementation. You start it manually, fix issues right in the branch, then merge findings back.
+The LLM queues a review after implementation. You start it manually, correct review right in the branch, and then merge findings back.
 
 ```
 LLM:     Implementation done. Let me queue a fresh review.
 
 LLM:     [calls push-task({ prompt: "Review the implementation
          against the plan. Check correctness, edge cases,
-         and test coverage.", inherit_context: true })]
+         and test coverage."})]
 
 LLM:     Task stored. Run /start-task to review.
 
