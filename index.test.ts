@@ -129,7 +129,7 @@ describe('abortTask', () => {
 
     appendUserMessage('main work');
     appendAssistantMessage('working...');
-    await runPushTask('Quick fix.', true);
+    await runPushTask('Quick fix.');
 
     await runStartTask();
     assert.ok(isLlmTriggered());
@@ -137,14 +137,25 @@ describe('abortTask', () => {
     appendAssistantMessage('Partial work...');
 
     await runAbortTask();
-    assert.strictEqual(getStatus(), undefined);
+    assert.strictEqual(getStatus(), 'pending task: quick-fix');
     assert.ok(!isLlmTriggered());
     assertBranchHistory(
         user('main work'),
         assistant('working...'),
-        task('Quick fix.', true),
+        task('Quick fix.'),
         notification('Task stored. Use `/start-task` or `/auto` to start it.'),
         notification('Task aborted. Branch abandoned without summary.'),
+    );
+
+    await runStartTask();
+    assert.ok(isLlmTriggered());
+
+    appendAssistantMessage('Full work');
+    assert.strictEqual(getStatus(), 'current task: quick-fix');
+    assert.ok(!isLlmTriggered());
+    assertBranchHistory(
+        user('Quick fix.'),
+        assistant('Full work'),
     );
   });
 });

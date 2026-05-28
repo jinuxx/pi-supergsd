@@ -326,10 +326,6 @@ async function abortTask(
   const result = await ctx.navigateTree(taskStart.data.returnTo, { summarize: false });
   if (result.cancelled) return 'cancelled';
 
-  if (pendingTask(ctx.sessionManager)) {
-    pi.appendEntry(TASK_DONE_ENTRY_TYPE, {});
-  }
-
   ctx.ui.notify('Task aborted. Branch abandoned without summary.', 'info');
 
   if (ctx.hasUI) {
