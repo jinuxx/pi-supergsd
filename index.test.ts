@@ -19,6 +19,46 @@ import registerTaskCommands, {
   createAutoCommand,
 } from './index.js';
 
+// ── Branch history helpers ──────────────────────────────────────
+
+type NotificationEntry = {
+  type: 'notification';
+  text: string;
+  afterEntryId: string | null;
+};
+
+type BranchEntry = import('@earendil-works/pi-coding-agent').SessionEntry | NotificationEntry;
+
+const user = (content: string) => ({
+  type: 'message' as const,
+  message: { role: 'user' as const, content }
+});
+
+const assistant = (content: string) => ({
+  type: 'message' as const,
+  message: { role: 'assistant' as const, content: [{ type: 'text' as const, text: content }] }
+});
+
+const task = (prompt: string, inherit_context = false) => ({
+  type: 'custom' as const,
+  customType: 'task',
+  data: { prompt, inherit_context }
+});
+
+const taskResult = (slug: string, content = '') => ({
+  type: 'custom_message' as const,
+  customType: 'task-result',
+  content,
+  details: { slug },
+  display: true
+});
+
+const notification = (text: string) => ({
+  type: 'notification' as const,
+  text,
+  afterEntryId: null as string | null
+});
+
 // ── Integration: /start-task ─────────────────────────────────────
 
 describe('integration: /start-task fresh context', () => {
