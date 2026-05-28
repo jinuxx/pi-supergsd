@@ -392,6 +392,7 @@ function makeHarness() {
   const triggeredCustomMessages = new Set<string>();
   const triggeredUserMessages = new Set<string>();
   const hints: Array<{ text: string }> = [];
+  const trackedHints: Array<{ text: string; afterEntryId: string | null }> = [];
   let cancelNextNav = false;
   let pendingMessages = false;
   let taskStatus: string | undefined;
@@ -447,6 +448,7 @@ function makeHarness() {
     ui: {
       notify(message: string) {
         hints.push({ text: message });
+        trackedHints.push({ text: message, afterEntryId: sm.getLeafId() });
       },
       setStatus(key: string, value: string | undefined) {
         if (key === 'task') taskStatus = value;
@@ -504,6 +506,38 @@ function makeHarness() {
     const last = hints[hints.length - 1];
     hints.length = 0;
     return last.text;
+  }
+
+  function assertBranchHistory(...expected: Partial<BranchEntry>[]) {
+    const entries = sm.getBranch();
+    const actual: Partial<BranchEntry>[] = [];
+    const consumedHints = new Set<number>();
+
+    for (const entry of entries) {
+      // Skip internal bookkeeping
+      if (entry.type === 'custom' && entry.customType === 'task-done') continue;
+
+      // Strip IDs for comparison
+      const { id, parentId, timestamp, ...rest } = entry as unknown as Record<string, unknown>;
+      actual.push(rest as Partial<BranchEntry>);
+
+      // Insert tracked hints with matching afterEntryId
+      for (let i = 0; i < trackedHints.length; i++) {
+        if (trackedHints[i].afterEntryId === entry.id) {
+          actual.push(notification(trackedHints[i].text));
+          consumedHints.add(i);
+        }
+      }
+    }
+
+    // Unclassified hints (afterEntryId === null) go at start
+    for (let i = 0; i < trackedHints.length; i++) {
+      if (!consumedHints.has(i) && trackedHints[i].afterEntryId === null) {
+        actual.unshift(notification(trackedHints[i].text));
+      }
+    }
+
+    assert.deepStrictEqual(actual, expected);
   }
 
   function getLlmHistory(): string[] {
@@ -584,11 +618,10 @@ function makeHarness() {
   }
 
   return {
-    getLlmHistory,
+    assertBranchHistory,
     isLlmTriggered,
     getLastHint,
     getStatus,
-    getLastTaskResultDetails,
     appendUserMessage,
     appendAssistantMessage,
     releaseNextIdle,
