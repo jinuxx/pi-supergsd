@@ -119,9 +119,7 @@ export function createPushTaskTool(pi: ExtensionAPI): ToolDefinition {
       return new Text([header, ...displayLines].join('\n'), 0, 0);
     },
     renderResult(_result, _options, theme) {
-      const header = theme.fg('toolTitle', theme.bold('push-task'));
-      const label = theme.fg('dim', 'Stored. Use /start-task or /auto to execute.');
-      return new Text(`${header}\n${label}`, 0, 0);
+      return new Text(theme.fg('dim', 'Stored. Use /start-task or /auto to execute.'), 0, 0);
     },
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       if (signal?.aborted) {
