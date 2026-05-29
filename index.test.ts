@@ -69,7 +69,56 @@ pathSuite('manual workflow', (path) => {
                         taskResult('task-aaa', 'Done.'),
                         notification('Task finished. Last response attached.'),
                     );
+                },
+                path('start AAA [no task]', async (h) => {
+                    await h.runStartTask();
+                    assert.strictEqual(h.getStatus(), undefined);
+                    assert.ok(h.isLlmTriggered());
+                    h.assertBranchHistory(
+                        user('main work'),
+                        assistant('working...'),
+                        task('Task AAA'),
+                        taskResult('task-aaa', 'Done.'),
+                        notification('No pending task. Use push-task first.'),
+                    );
                 }),
+                path('discard AAA [no task]', async (h) => {
+                    await h.runDiscardTask();
+                    assert.strictEqual(h.getStatus(), undefined);
+                    assert.ok(h.isLlmTriggered());
+                    h.assertBranchHistory(
+                        user('main work'),
+                        assistant('working...'),
+                        task('Task AAA'),
+                        taskResult('task-aaa', 'Done.'),
+                        notification('No pending task to discard.'),
+                    );
+                }),
+                path('finish AAA [no task]', async (h) => {
+                    await h.runFinishTask();
+                    assert.strictEqual(h.getStatus(), undefined);
+                    assert.ok(h.isLlmTriggered());
+                    h.assertBranchHistory(
+                        user('main work'),
+                        assistant('working...'),
+                        task('Task AAA'),
+                        taskResult('task-aaa', 'Done.'),
+                        notification('Not inside task, nothing to finish.'),
+                    );
+                }),
+                path('abort AAA [no task]', async (h) => {
+                    await h.runAbortTask();
+                    assert.strictEqual(h.getStatus(), undefined);
+                    assert.ok(h.isLlmTriggered());
+                    h.assertBranchHistory(
+                        user('main work'),
+                        assistant('working...'),
+                        task('Task AAA'),
+                        taskResult('task-aaa', 'Done.'),
+                        notification('Not inside task, nothing to abort.'),
+                    );
+                }),
+                ),
                 path('abort AAA', async (h) => {
                         h.appendAssistantMessage('Partial...');
                         await h.runAbortTask();
@@ -357,7 +406,56 @@ pathSuite('manual workflow', (path) => {
                         taskResult('task-aaa', 'Done.'),
                         notification('Task finished. Last response attached.'),
                     );
+                },
+                path('start AAA [no task]', async (h) => {
+                    await h.runStartTask();
+                    assert.strictEqual(h.getStatus(), undefined);
+                    assert.ok(h.isLlmTriggered());
+                    h.assertBranchHistory(
+                        user('main work'),
+                        assistant('working...'),
+                        task('Task AAA', true),
+                        taskResult('task-aaa', 'Done.'),
+                        notification('No pending task. Use push-task first.'),
+                    );
                 }),
+                path('discard AAA [no task]', async (h) => {
+                    await h.runDiscardTask();
+                    assert.strictEqual(h.getStatus(), undefined);
+                    assert.ok(h.isLlmTriggered());
+                    h.assertBranchHistory(
+                        user('main work'),
+                        assistant('working...'),
+                        task('Task AAA', true),
+                        taskResult('task-aaa', 'Done.'),
+                        notification('No pending task to discard.'),
+                    );
+                }),
+                path('finish AAA [no task]', async (h) => {
+                    await h.runFinishTask();
+                    assert.strictEqual(h.getStatus(), undefined);
+                    assert.ok(h.isLlmTriggered());
+                    h.assertBranchHistory(
+                        user('main work'),
+                        assistant('working...'),
+                        task('Task AAA', true),
+                        taskResult('task-aaa', 'Done.'),
+                        notification('Not inside task, nothing to finish.'),
+                    );
+                }),
+                path('abort AAA [no task]', async (h) => {
+                    await h.runAbortTask();
+                    assert.strictEqual(h.getStatus(), undefined);
+                    assert.ok(h.isLlmTriggered());
+                    h.assertBranchHistory(
+                        user('main work'),
+                        assistant('working...'),
+                        task('Task AAA', true),
+                        taskResult('task-aaa', 'Done.'),
+                        notification('Not inside task, nothing to abort.'),
+                    );
+                }),
+                ),
                 path('abort AAA', async (h) => {
                         h.appendAssistantMessage('Partial...');
                         await h.runAbortTask();
@@ -629,7 +727,55 @@ pathSuite('manual workflow', (path) => {
             ),
         );
 
-    return [nonInherited, inherited];
+    const startNoTask = path('start AAA [no task]', async (h) => {
+        setup(h);
+        await h.runStartTask();
+        assert.strictEqual(h.getStatus(), undefined);
+        assert.ok(!h.isLlmTriggered());
+        h.assertBranchHistory(
+            user('main work'),
+            assistant('working...'),
+            notification('No pending task. Use push-task first.'),
+        );
+    });
+
+    const discardNoTask = path('discard AAA [no task]', async (h) => {
+        setup(h);
+        await h.runDiscardTask();
+        assert.strictEqual(h.getStatus(), undefined);
+        assert.ok(!h.isLlmTriggered());
+        h.assertBranchHistory(
+            user('main work'),
+            assistant('working...'),
+            notification('No pending task to discard.'),
+        );
+    });
+
+    const finishNoTask = path('finish AAA [no task]', async (h) => {
+        setup(h);
+        await h.runFinishTask();
+        assert.strictEqual(h.getStatus(), undefined);
+        assert.ok(!h.isLlmTriggered());
+        h.assertBranchHistory(
+            user('main work'),
+            assistant('working...'),
+            notification('Not inside task, nothing to finish.'),
+        );
+    });
+
+    const abortNoTask = path('abort AAA [no task]', async (h) => {
+        setup(h);
+        await h.runAbortTask();
+        assert.strictEqual(h.getStatus(), undefined);
+        assert.ok(!h.isLlmTriggered());
+        h.assertBranchHistory(
+            user('main work'),
+            assistant('working...'),
+            notification('Not inside task, nothing to abort.'),
+        );
+    });
+
+    return [nonInherited, inherited, startNoTask, discardNoTask, finishNoTask, abortNoTask];
 });
 
 describe('automated workflow', () => {
