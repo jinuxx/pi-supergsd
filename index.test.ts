@@ -599,6 +599,309 @@ pathSuite('manual workflow', (path) =>
         ),
       ),
     ),
+    path('push-task [inherited]', async (h) => {
+      await h.runPushTask('Some task.', true);
+      assert.strictEqual(h.getStatus(), 'pending task: task');
+      assert.ok(!h.isLlmTriggered());
+      h.assertBranchHistory(
+        user('main work'),
+        assistant('working...'),
+        task('Some task.', true),
+        notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+      );
+    },
+      path('discard-task', async (h) => {
+        await h.runDiscardTask();
+        assert.strictEqual(h.getStatus(), undefined);
+        assert.ok(!h.isLlmTriggered());
+        h.assertBranchHistory(
+          user('main work'),
+          assistant('working...'),
+          task('Some task.', true),
+          notification('Task discarded.'),
+        );
+      }),
+      path('start-task', async (h) => {
+        await h.runStartTask();
+        assert.strictEqual(h.getStatus(), 'current task: task');
+        assert.ok(h.isLlmTriggered());
+        h.assertBranchHistory(
+          user('main work'),
+          assistant('working...'),
+          task('Some task.', true),
+          user('Some task.'),
+        );
+      },
+        path('finish-task', async (h) => {
+          h.appendAssistantMessage('Done.');
+          await h.runFinishTask();
+          assert.strictEqual(h.getStatus(), undefined);
+          assert.ok(h.isLlmTriggered());
+          h.assertBranchHistory(
+            user('main work'),
+            assistant('working...'),
+            task('Some task.', true),
+            taskResult('task', 'Done.'),
+            notification('Task finished. Last response attached.'),
+          );
+        }),
+        path('abort-task', async (h) => {
+          h.appendAssistantMessage('Partial...');
+          await h.runAbortTask();
+          assert.strictEqual(h.getStatus(), 'pending task: task');
+          assert.ok(!h.isLlmTriggered());
+          h.assertBranchHistory(
+            user('main work'),
+            assistant('working...'),
+            task('Some task.', true),
+            notification('Task aborted. Branch abandoned without summary.'),
+          );
+        },
+          path('start-task', async (h) => {
+            await h.runStartTask();
+            assert.strictEqual(h.getStatus(), 'current task: task');
+            assert.ok(h.isLlmTriggered());
+            h.assertBranchHistory(
+              user('main work'),
+              assistant('working...'),
+              task('Some task.', true),
+              user('Some task.'),
+            );
+          },
+            path('finish-task', async (h) => {
+              h.appendAssistantMessage('Done.');
+              await h.runFinishTask();
+              assert.strictEqual(h.getStatus(), undefined);
+              assert.ok(h.isLlmTriggered());
+              h.assertBranchHistory(
+                user('main work'),
+                assistant('working...'),
+                task('Some task.', true),
+                taskResult('task', 'Done.'),
+                notification('Task finished. Last response attached.'),
+              );
+            }),
+          ),
+        ),
+        path('push-task', async (h) => {
+          await h.runPushTask('Another task.');
+          assert.strictEqual(h.getStatus(), 'pending task: another-task');
+          h.assertBranchHistory(
+            user('main work'),
+            assistant('working...'),
+            task('Some task.', true),
+            user('Some task.'),
+            task('Another task.'),
+            notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+          );
+        },
+          path('discard-task', async (h) => {
+            await h.runDiscardTask();
+            assert.strictEqual(h.getStatus(), 'current task: task');
+            assert.ok(h.isLlmTriggered());
+            h.assertBranchHistory(
+              user('main work'),
+              assistant('working...'),
+              task('Some task.', true),
+              user('Some task.'),
+              task('Another task.'),
+              notification('Task discarded.'),
+            );
+          },
+            path('finish-task', async (h) => {
+              h.appendAssistantMessage('Done.');
+              await h.runFinishTask();
+              assert.strictEqual(h.getStatus(), undefined);
+              assert.ok(h.isLlmTriggered());
+              h.assertBranchHistory(
+                user('main work'),
+                assistant('working...'),
+                task('Some task.', true),
+                taskResult('task', 'Done.'),
+                notification('Task finished. Last response attached.'),
+              );
+            }),
+          ),
+          path('start-task', async (h) => {
+            await h.runStartTask();
+            assert.strictEqual(h.getStatus(), 'current task: another-task');
+            assert.ok(h.isLlmTriggered());
+            h.assertBranchHistory(
+              user('Another task.'),
+            );
+          },
+            path('finish-task', async (h) => {
+              h.appendAssistantMessage('inner done');
+              await h.runFinishTask();
+              assert.strictEqual(h.getStatus(), 'current task: task');
+              assert.ok(h.isLlmTriggered());
+              h.assertBranchHistory(
+                user('main work'),
+                assistant('working...'),
+                task('Some task.', true),
+                user('Some task.'),
+                task('Another task.'),
+                taskResult('another-task', 'inner done'),
+                notification('Task finished. Last response attached.'),
+              );
+            },
+              path('finish-task', async (h) => {
+                h.appendAssistantMessage('Done.');
+                await h.runFinishTask();
+                assert.strictEqual(h.getStatus(), undefined);
+                assert.ok(h.isLlmTriggered());
+                h.assertBranchHistory(
+                  user('main work'),
+                  assistant('working...'),
+                  task('Some task.', true),
+                  taskResult('task', 'Done.'),
+                  notification('Task finished. Last response attached.'),
+                );
+              }),
+            ),
+            path('abort-task', async (h) => {
+              h.appendAssistantMessage('partial inner');
+              await h.runAbortTask();
+              assert.strictEqual(h.getStatus(), 'pending task: another-task');
+              assert.ok(h.isLlmTriggered());
+              h.assertBranchHistory(
+                user('main work'),
+                assistant('working...'),
+                task('Some task.', true),
+                user('Some task.'),
+                task('Another task.'),
+                notification('Task aborted. Branch abandoned without summary.'),
+              );
+            },
+              path('finish-task', async (h) => {
+                h.appendAssistantMessage('Done.');
+                await h.runFinishTask();
+                assert.strictEqual(h.getStatus(), undefined);
+                assert.ok(h.isLlmTriggered());
+                h.assertBranchHistory(
+                  user('main work'),
+                  assistant('working...'),
+                  task('Some task.', true),
+                  taskResult('task', 'Done.'),
+                  notification('Task finished. Last response attached.'),
+                );
+              }),
+            ),
+          ),
+        ),
+        path('push-task [inherited]', async (h) => {
+          await h.runPushTask('Another task.', true);
+          assert.strictEqual(h.getStatus(), 'pending task: another-task');
+          h.assertBranchHistory(
+            user('main work'),
+            assistant('working...'),
+            task('Some task.', true),
+            user('Some task.'),
+            task('Another task.', true),
+            notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+          );
+        },
+          path('discard-task', async (h) => {
+            await h.runDiscardTask();
+            assert.strictEqual(h.getStatus(), 'current task: task');
+            assert.ok(h.isLlmTriggered());
+            h.assertBranchHistory(
+              user('main work'),
+              assistant('working...'),
+              task('Some task.', true),
+              user('Some task.'),
+              task('Another task.', true),
+              notification('Task discarded.'),
+            );
+          },
+            path('finish-task', async (h) => {
+              h.appendAssistantMessage('Done.');
+              await h.runFinishTask();
+              assert.strictEqual(h.getStatus(), undefined);
+              assert.ok(h.isLlmTriggered());
+              h.assertBranchHistory(
+                user('main work'),
+                assistant('working...'),
+                task('Some task.', true),
+                taskResult('task', 'Done.'),
+                notification('Task finished. Last response attached.'),
+              );
+            }),
+          ),
+          path('start-task', async (h) => {
+            await h.runStartTask();
+            assert.strictEqual(h.getStatus(), 'current task: another-task');
+            assert.ok(h.isLlmTriggered());
+            h.assertBranchHistory(
+              user('main work'),
+              assistant('working...'),
+              task('Some task.', true),
+              user('Some task.'),
+              task('Another task.', true),
+              user('Another task.'),
+            );
+          },
+            path('finish-task', async (h) => {
+              h.appendAssistantMessage('inner done');
+              await h.runFinishTask();
+              assert.strictEqual(h.getStatus(), 'current task: task');
+              assert.ok(h.isLlmTriggered());
+              h.assertBranchHistory(
+                user('main work'),
+                assistant('working...'),
+                task('Some task.', true),
+                user('Some task.'),
+                task('Another task.', true),
+                taskResult('another-task', 'inner done'),
+                notification('Task finished. Last response attached.'),
+              );
+            },
+              path('finish-task', async (h) => {
+                h.appendAssistantMessage('Done.');
+                await h.runFinishTask();
+                assert.strictEqual(h.getStatus(), undefined);
+                assert.ok(h.isLlmTriggered());
+                h.assertBranchHistory(
+                  user('main work'),
+                  assistant('working...'),
+                  task('Some task.', true),
+                  taskResult('task', 'Done.'),
+                  notification('Task finished. Last response attached.'),
+                );
+              }),
+            ),
+            path('abort-task', async (h) => {
+              h.appendAssistantMessage('partial inner');
+              await h.runAbortTask();
+              assert.strictEqual(h.getStatus(), 'pending task: another-task');
+              assert.ok(h.isLlmTriggered());
+              h.assertBranchHistory(
+                user('main work'),
+                assistant('working...'),
+                task('Some task.', true),
+                user('Some task.'),
+                task('Another task.', true),
+                notification('Task aborted. Branch abandoned without summary.'),
+              );
+            },
+              path('finish-task', async (h) => {
+                h.appendAssistantMessage('Done.');
+                await h.runFinishTask();
+                assert.strictEqual(h.getStatus(), undefined);
+                assert.ok(h.isLlmTriggered());
+                h.assertBranchHistory(
+                  user('main work'),
+                  assistant('working...'),
+                  task('Some task.', true),
+                  taskResult('task', 'Done.'),
+                  notification('Task finished. Last response attached.'),
+                );
+              }),
+            ),
+          ),
+        ),
+      ),
+    ),
   ),
 );
 
