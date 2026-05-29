@@ -372,6 +372,41 @@ pathSuite('manual workflow', (path) =>
             notification('Task finished. Last response attached.'),
           );
         }),
+        path('abort-task', async (h) => {
+          h.appendAssistantMessage('Partial...');
+          await h.runAbortTask();
+          assert.strictEqual(h.getStatus(), 'pending task: task');
+          assert.ok(!h.isLlmTriggered());
+          h.assertBranchHistory(
+            user('main work'),
+            assistant('working...'),
+            task('Some task.'),
+            notification('Task aborted. Branch abandoned without summary.'),
+          );
+        },
+          path('start-task', async (h) => {
+            await h.runStartTask();
+            assert.strictEqual(h.getStatus(), 'current task: task');
+            assert.ok(h.isLlmTriggered());
+            h.assertBranchHistory(
+              user('Some task.'),
+            );
+          },
+            path('finish-task', async (h) => {
+              h.appendAssistantMessage('Done.');
+              await h.runFinishTask();
+              assert.strictEqual(h.getStatus(), undefined);
+              assert.ok(h.isLlmTriggered());
+              h.assertBranchHistory(
+                user('main work'),
+                assistant('working...'),
+                task('Some task.'),
+                taskResult('task', 'Done.'),
+                notification('Task finished. Last response attached.'),
+              );
+            }),
+          ),
+        ),
       ),
     ),
   ),
