@@ -47,24 +47,28 @@ export class FauxResponseQueue {
 
   stream = (_model: Model, context: Context): FauxEventStream => {
     const stream = new FauxEventStream();
-    const descriptor = this.queued.shift();
     const lastUser = [...context.messages].reverse().find(message => message.role === 'user');
     if (lastUser) this.seenPrompts.push(readUserText(lastUser.content));
 
+    const attemptNumber = this.callCount + 1;
+
     queueMicrotask(() => {
+      // Shift synchronously — if nothing is queued, error immediately.
+      // Auto reactions no longer use the faux provider (they append
+      // directly to the session manager), so we fail fast here.
+      const descriptor = this.queued.shift();
       if (!descriptor) {
         const error = makeAssistantMessage(
           [],
           'error',
-          `No faux response queued for provider call ${this.callCount + 1}`,
+          `No faux response queued for provider call ${attemptNumber}`,
         );
         stream.push({ type: 'error', reason: 'error' as const, error });
         stream.end(error);
         return;
       }
-
-      this.callCount++;
-      emitDescriptor(stream, descriptor, this.callCount);
+      this.callCount = attemptNumber;
+      emitDescriptor(stream, descriptor, attemptNumber);
     });
 
     return stream;

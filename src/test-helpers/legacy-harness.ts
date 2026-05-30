@@ -23,11 +23,13 @@ import {
 
 import {
   notification,
-  type AutoConfig,
   type BranchEntry,
-  type MatchDescriptor,
-  type ReactionDescriptor,
+  type ControlReactionDescriptor,
+  type UserEntry,
+  type AssistantEntry,
+  type TaskEntry,
 } from './common.js';
+
 import { extractContentText, makeUserMessage, PiStub } from './pi-stub.js';
 
 export class LegacyTestHarness {
@@ -225,7 +227,7 @@ export class LegacyTestHarness {
     await this.runTaskCommand(cmdAbortTask());
   }
 
-  async runAuto(config: AutoConfig): Promise<void> {
+  async runAuto(config: LegacyAutoConfig): Promise<void> {
     const reactions = config.reactions ?? [];
     let settled = false;
     let lastStep = -1;
@@ -350,7 +352,7 @@ export class LegacyTestHarness {
   }
 
   private scanAndReact(
-    reactions: Array<[MatchDescriptor, ReactionDescriptor]>,
+    reactions: Array<[LegacyMatchDescriptor, LegacyReactionDescriptor]>,
     seenIds: Set<string>,
   ): void {
     const branch = this.sm.getBranch();
@@ -366,7 +368,7 @@ export class LegacyTestHarness {
     }
   }
 
-  private entryMatches(entry: SessionEntry, match: MatchDescriptor): boolean {
+  private entryMatches(entry: SessionEntry, match: LegacyMatchDescriptor): boolean {
     if (match.type === 'message') {
       if (entry.type !== 'message') return false;
       if (entry.message.role !== 'user' && entry.message.role !== 'assistant') return false;
@@ -388,7 +390,7 @@ export class LegacyTestHarness {
     return false;
   }
 
-  private applyReaction(reaction: ReactionDescriptor): void {
+  private applyReaction(reaction: LegacyReactionDescriptor): void {
     switch (reaction.type) {
       case 'user-esc':
         this.cancelNextNav = true;
@@ -414,6 +416,17 @@ export class LegacyTestHarness {
     }
   }
 }
+
+interface LegacyAutoConfig {
+  reactions?: Array<[LegacyMatchDescriptor, LegacyReactionDescriptor]>;
+}
+
+// Legacy types preserved for the SessionManager-based harness
+// so existing tests keep compiling after ReactionDescriptor was
+// narrowed for the new AgentSession-backed harness.
+type LegacyMatchDescriptor = UserEntry | AssistantEntry | TaskEntry;
+
+type LegacyReactionDescriptor = UserEntry | AssistantEntry | TaskEntry | ControlReactionDescriptor;
 
 type TaskCommand = { handler: (args: string, ctx: ExtensionCommandContext) => Promise<void> };
 
@@ -468,10 +481,6 @@ const TEST_USAGE = {
   },
 };
 
-type AssistantAppendedMessage = Extract<AppendedMessage, { role: 'assistant' }>;
-
-type AppendedMessage = Parameters<SessionManager['appendMessage']>[0];
-
 function readTaskData(data: unknown): { prompt: string; inherit_context: boolean } | null {
   if (!isRecord(data)) return null;
   if (typeof data.prompt !== 'string' || typeof data.inherit_context !== 'boolean') return null;
@@ -493,6 +502,10 @@ function normalizeStopReason(stopReason?: string): AssistantAppendedMessage['sto
       return 'stop';
   }
 }
+
+type AssistantAppendedMessage = Extract<AppendedMessage, { role: 'assistant' }>;
+
+type AppendedMessage = Parameters<SessionManager['appendMessage']>[0];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

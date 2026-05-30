@@ -1,9 +1,14 @@
 export type {
   AutoConfig,
   BranchEntry,
-  MatchDescriptor,
+  ControlReactionDescriptor,
+
+  MatchDescriptor_,
   NotificationEntry,
   ReactionDescriptor,
+  UserEntry,
+  AssistantEntry,
+  TaskEntry,
 } from './descriptors.js';
 
 export {

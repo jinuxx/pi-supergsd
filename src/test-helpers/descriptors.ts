@@ -1,20 +1,10 @@
 import type { ExtensionCommandContext } from '@earendil-works/pi-coding-agent';
 
 export interface AutoConfig {
-  reactions?: Array<[MatchDescriptor, ReactionDescriptor]>;
+  reactions?: Array<[MatchDescriptor_, ReactionDescriptor | ResponseDescriptor | ResponseDescriptor[]]>;
 }
 
-/** Entry kinds that can appear in a reaction pair's match slot. */
-export type MatchDescriptor = UserEntry | AssistantEntry | TaskEntry;
 
-/** Entry kinds that can appear in a reaction pair's reaction slot. */
-export type ReactionDescriptor =
-  | UserEntry
-  | AssistantEntry
-  | TaskEntry
-  | { type: 'user-esc' }
-  | { type: 'user-ctrl-c' }
-  | { type: 'user-runs-auto' };
 
 export type BranchEntry = UserEntry | AssistantEntry | TaskEntry | TaskResultEntry | NotificationEntry;
 
@@ -24,7 +14,7 @@ export type NotificationEntry = {
   afterEntryId: string | null;
 };
 
-export type ResponseDescriptor = RespondsDescriptor | ThinksDescriptor | AbortsDescriptor | PushTaskDescriptor;
+export type MatchDescriptor_ = PromptMatch | QueuedTaskMatch | UserEntry | AssistantEntry;
 
 export type PromptMatch = { type: 'match:prompt'; text: string };
 
@@ -33,6 +23,15 @@ export type QueuedTaskMatch = {
   prompt: string;
   inherit_context: boolean;
 };
+
+export type ReactionDescriptor = ControlReactionDescriptor | ResponseDescriptor | ResponseDescriptor[];
+
+export type ControlReactionDescriptor =
+  | { type: 'user-esc' }
+  | { type: 'user-ctrl-c' }
+  | { type: 'user-runs-auto' };
+
+export type ResponseDescriptor = RespondsDescriptor | ThinksDescriptor | AbortsDescriptor | PushTaskDescriptor;
 
 export type RespondsDescriptor = { type: 'response:text'; text: string };
 
@@ -44,6 +43,32 @@ export type PushTaskDescriptor = {
   type: 'response:push-task';
   prompt: string;
   inherit_context: boolean;
+};
+
+export type AssistantEntry = {
+  type: 'message';
+  message: {
+    role: 'assistant';
+    content: TextBlock[];
+    stopReason?: string;
+  };
+};
+
+export type UserEntry = {
+  type: 'message';
+  message: {
+    role: 'user';
+    content: TextBlock[];
+  };
+};
+
+export type TaskEntry = {
+  type: 'custom';
+  customType: 'task';
+  data: {
+    prompt: string;
+    inherit_context: boolean;
+  };
 };
 
 export {
@@ -73,15 +98,6 @@ const assistant = (content: string, stopReason?: string): AssistantEntry => ({
   },
 });
 
-type AssistantEntry = {
-  type: 'message';
-  message: {
-    role: 'assistant';
-    content: TextBlock[];
-    stopReason?: string;
-  };
-};
-
 const user = (content: string): UserEntry => ({
   type: 'message',
   message: {
@@ -90,28 +106,11 @@ const user = (content: string): UserEntry => ({
   },
 });
 
-type UserEntry = {
-  type: 'message';
-  message: {
-    role: 'user';
-    content: TextBlock[];
-  };
-};
-
 const task = (prompt: string, inherit_context = false): TaskEntry => ({
   type: 'custom',
   customType: 'task',
   data: { prompt, inherit_context },
 });
-
-type TaskEntry = {
-  type: 'custom';
-  customType: 'task';
-  data: {
-    prompt: string;
-    inherit_context: boolean;
-  };
-};
 
 const taskResult = (slug: string, content?: string): TaskResultEntry => ({
   type: 'custom_message',
