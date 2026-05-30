@@ -59,7 +59,7 @@ describe('manual workflow', () => {
                         notification('Task finished. Last response attached.'),
                     );
                 },
-                path('start AAA [no task]', async (h) => {
+                path('start [no task]', async (h) => {
                     await h.runStartTask();
                     assert.strictEqual(h.getStatus(), undefined);
                     assert.ok(h.isLlmTriggered());
@@ -71,7 +71,7 @@ describe('manual workflow', () => {
                         notification('No pending task. Use push-task first.'),
                     );
                 }),
-                path('discard AAA [no task]', async (h) => {
+                path('discard [no task]', async (h) => {
                     await h.runDiscardTask();
                     assert.strictEqual(h.getStatus(), undefined);
                     assert.ok(h.isLlmTriggered());
@@ -83,7 +83,7 @@ describe('manual workflow', () => {
                         notification('No pending task to discard.'),
                     );
                 }),
-                path('finish AAA [no task]', async (h) => {
+                path('finish [no task]', async (h) => {
                     await h.runFinishTask();
                     assert.strictEqual(h.getStatus(), undefined);
                     assert.ok(h.isLlmTriggered());
@@ -95,7 +95,7 @@ describe('manual workflow', () => {
                         notification('Not inside task, nothing to finish.'),
                     );
                 }),
-                path('abort AAA [no task]', async (h) => {
+                path('abort [no task]', async (h) => {
                     await h.runAbortTask();
                     assert.strictEqual(h.getStatus(), undefined);
                     assert.ok(h.isLlmTriggered());
@@ -396,7 +396,7 @@ describe('manual workflow', () => {
                         notification('Task finished. Last response attached.'),
                     );
                 },
-                path('start AAA [no task]', async (h) => {
+                path('start [no task]', async (h) => {
                     await h.runStartTask();
                     assert.strictEqual(h.getStatus(), undefined);
                     assert.ok(h.isLlmTriggered());
@@ -408,7 +408,7 @@ describe('manual workflow', () => {
                         notification('No pending task. Use push-task first.'),
                     );
                 }),
-                path('discard AAA [no task]', async (h) => {
+                path('discard [no task]', async (h) => {
                     await h.runDiscardTask();
                     assert.strictEqual(h.getStatus(), undefined);
                     assert.ok(h.isLlmTriggered());
@@ -420,7 +420,7 @@ describe('manual workflow', () => {
                         notification('No pending task to discard.'),
                     );
                 }),
-                path('finish AAA [no task]', async (h) => {
+                path('finish [no task]', async (h) => {
                     await h.runFinishTask();
                     assert.strictEqual(h.getStatus(), undefined);
                     assert.ok(h.isLlmTriggered());
@@ -432,7 +432,7 @@ describe('manual workflow', () => {
                         notification('Not inside task, nothing to finish.'),
                     );
                 }),
-                path('abort AAA [no task]', async (h) => {
+                path('abort [no task]', async (h) => {
                     await h.runAbortTask();
                     assert.strictEqual(h.getStatus(), undefined);
                     assert.ok(h.isLlmTriggered());
@@ -715,7 +715,7 @@ describe('manual workflow', () => {
                 ),
             ),
         ),
-        path('start AAA [no task]', async (h) => {
+        path('start [no task]', async (h) => {
         h.appendUserMessage('main work');
         h.appendAssistantMessage('working...');
         await h.runStartTask();
@@ -727,7 +727,7 @@ describe('manual workflow', () => {
             notification('No pending task. Use push-task first.'),
         );
     }),
-        path('discard AAA [no task]', async (h) => {
+        path('discard [no task]', async (h) => {
         h.appendUserMessage('main work');
         h.appendAssistantMessage('working...');
         await h.runDiscardTask();
@@ -739,7 +739,7 @@ describe('manual workflow', () => {
             notification('No pending task to discard.'),
         );
     }),
-        path('finish AAA [no task]', async (h) => {
+        path('finish [no task]', async (h) => {
         h.appendUserMessage('main work');
         h.appendAssistantMessage('working...');
         await h.runFinishTask();
@@ -751,7 +751,7 @@ describe('manual workflow', () => {
             notification('Not inside task, nothing to finish.'),
         );
     }),
-        path('abort AAA [no task]', async (h) => {
+        path('abort [no task]', async (h) => {
         h.appendUserMessage('main work');
         h.appendAssistantMessage('working...');
         await h.runAbortTask();
