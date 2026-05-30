@@ -888,33 +888,84 @@ describe('automated workflow', () => {
     assert.ok(!h.isLlmTriggered());
   });
 
-  it('keeps waiting while follow-up work is pending after finishTask', async () => {
-    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, setPendingMessages, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, legacyRunAuto } =
-      makeHarness();
+  it('processes a subtask pushed during a task', async () => {
+    const h = makeHarness();
 
-    appendUserMessage('start');
-    await runPushTask('Quick fix.', true);
+    h.appendUserMessage('main work');
+    h.appendAssistantMessage('working...');
+    await h.runPushTask('parent task');
 
-    await runStartTask();
-
-    appendAssistantMessage('Fixed the bug.');
-
-    let resolved = false;
-    const running = legacyRunAuto().then(() => {
-      resolved = true;
+    await h.runAuto({
+      reactions: [
+        [user('parent task'), assistant('working on parent...')],
+        [assistant('working on parent...'), task('subtask')],
+        [user('subtask'), assistant('sub done')],
+      ],
     });
 
-    await flushMicrotasks();
-    setPendingMessages(true);
-    await releaseNextIdle();
-    await releaseNextIdle();
-    assert.ok(isLlmTriggered());
-    assert.strictEqual(resolved, false);
+    // Parent finishes last. Only original-branch entries appear (subtask
+    // entries are on different forks — same pattern as tests #1/#2).
+    h.assertBranchHistory(
+      user('main work'),
+      assistant('working...'),
+      task('parent task'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+      taskResult('parent-task', 'working on parent...'),
+      notification('Task finished. Last response attached.'),
+    );
+  });
 
-    setPendingMessages(false);
-    await releaseNextIdle();
-    await running;
-    assert.strictEqual(resolved, true);
+  it('continues processing when user queues a steering message during auto', async () => {
+    const h = makeHarness();
+
+    h.appendUserMessage('start');
+    await h.runPushTask('Quick fix.', true);
+
+    await h.runAuto({
+      reactions: [
+        [user('Quick fix'), assistant('thinking...')],
+        [assistant('thinking...'), user('steer it')],
+        [user('steer it'), assistant('adjusted response')],
+      ],
+    });
+
+    // Auto processes: start task → assistant thinks → user steers →
+    // assistant adjusts → finish task with final response.
+    // Only original-branch entries appear (same pattern as test #2).
+    h.assertBranchHistory(
+      user('start'),
+      task('Quick fix.', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+      taskResult('quick-fix', 'adjusted response'),
+      notification('Task finished. Last response attached.'),
+    );
+    assert.ok(h.isLlmTriggered());
+  });
+
+  it('stops when session is shut down during auto', async () => {
+    const h = makeHarness();
+
+    h.appendUserMessage('start');
+    await h.runPushTask('Shutdown task', true);
+
+    await h.runAuto({
+      reactions: [
+        [user('Shutdown task'), assistant('working...')],
+        [assistant('working...'), userCtrlC()],
+      ],
+    });
+
+    // Auto started task (inherit, no navigation), injected assistant,
+    // then session shutdown fired. No navigation back — task-branch
+    // entries remain visible. No taskResult — task was never finished.
+    assert.ok(!h.isLlmTriggered());
+    h.assertBranchHistory(
+      user('start'),
+      task('Shutdown task', true),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+      user('Shutdown task'),
+      assistant('working...'),
+    );
   });
 });
 
@@ -973,6 +1024,8 @@ const taskResult = (slug: string, content?: string) => ({
 }) as unknown as Partial<BranchEntry>;
 
 const userEsc = () => ({ type: 'user-esc' as const });
+
+const userCtrlC = () => ({ type: 'user-ctrl-c' as const });
 
 // ── Test harness ─────────────────────────────────────────────────
 
@@ -1322,6 +1375,17 @@ function makeHarness() {
       return;
     }
 
+    // --- user-ctrl-c reaction: trigger session shutdown ---
+    if (r.type === 'user-ctrl-c') {
+      // Call all registered session_shutdown handlers.
+      // They are synchronous in practice (autoState.running = false),
+      // but fire them all to match emitSessionShutdown behaviour.
+      for (const handler of sessionShutdownHandlers) {
+        handler();
+      }
+      return;
+    }
+
     // --- message-type reactions (assistant, user) ---
     if (r.type === 'message' && r.message && typeof r.message === 'object') {
       const msg = r.message as Record<string, unknown>;
@@ -1339,6 +1403,25 @@ function makeHarness() {
         } as Parameters<typeof session.appendMessage>[0]);
         return;
       }
+
+      if (msg.role === 'user') {
+        const text = extractContentText(msg.content) ?? '';
+        session.appendMessage({
+          role: 'user',
+          content: [{ type: 'text', text }],
+          timestamp: 0,
+        });
+        return;
+      }
+    }
+
+    // --- custom-type reactions (task) ---
+    if (r.type === 'custom' && r.customType === 'task') {
+      const data = r.data as Record<string, unknown> | undefined;
+      const prompt = typeof data?.prompt === 'string' ? data.prompt : '';
+      const inherit_context = data?.inherit_context === true;
+      session.appendCustomEntry('task', { prompt, inherit_context });
+      return;
     }
   }
 
@@ -1370,9 +1453,16 @@ function makeHarness() {
 
       const waiter = idleWaiters.shift();
       if (waiter) {
-        // Scan BEFORE resolving idle: reactions can set cancelNextNav to affect
-        // the navigation that auto's handler is about to make.
-        scanAndReact(sm, reactions, seenIds);
+        // ── Fixed-point reaction engine ──────────────────────────
+        // Run reactions to completion before resolving the idle, so
+        // reaction chains (e.g., assistant → user → assistant) all
+        // fire before auto's handler gets to respond.
+        let dirty: boolean;
+        do {
+          const lenBefore = sm.getBranch().length;
+          scanAndReact(sm, reactions, seenIds);
+          dirty = sm.getBranch().length > lenBefore;
+        } while (dirty);
 
         waiter();
         for (let i = 0; i < 10; i++) await Promise.resolve();
@@ -1422,6 +1512,7 @@ type MatchDescriptor =
 type ReactionDescriptor =
   | Partial<BranchEntry>                        // assistant(), user(), task() helpers produce these
   | { type: 'user-esc' }                       // userEsc()
+  | { type: 'user-ctrl-c' }                    // userCtrlC()
   ;
 
 interface AutoConfig {

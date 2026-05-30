@@ -65,6 +65,8 @@ export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
         while (autoState.running) {
           await ctx.waitForIdle();
 
+          if (!autoState.running) break;
+
           if (lastAssistantWasAborted(ctx.sessionManager)) break;
 
           if (pendingTask(ctx.sessionManager)) {
