@@ -1257,7 +1257,8 @@ function makeHarness() {
     return createAutoCommand(pi).handler('', ctx) as Promise<void>;
   }
 
-  async function runAuto(_config: AutoConfig): Promise<void> {
+  async function runAuto(config: AutoConfig): Promise<void> {
+    void config; // placeholder — reaction matching in Phase 2
     let settled = false;
     const handlerPromise = createAutoCommand(pi).handler('', ctx).finally(() => { settled = true; });
 
