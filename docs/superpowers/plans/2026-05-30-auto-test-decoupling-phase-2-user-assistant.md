@@ -152,9 +152,9 @@ Before the `runAuto` function definition (~line 1273), add:
 
 ```ts
   /**
-   * Scan new branch entries (from lastScanIndex onward) and apply the first
-   * matching reaction for each new entry. Mutates lastScanIndex to track
-   * which entries have been processed.
+   * Scan new branch entries (from fromIndex through the current branch end)
+   * and apply the first matching reaction for each new entry.
+   * The caller is responsible for tracking the scan position.
    */
   function scanAndReact(
     session: SessionManager,
@@ -177,7 +177,7 @@ Before the `runAuto` function definition (~line 1273), add:
    * Check whether a branch entry matches a match descriptor.
    * Phase 2: supports user() match — user messages whose text contains the pattern.
    */
-  function entryMatches(entry: SessionEntry, match: MatchDescriptor): boolean {
+  function entryMatches(entry: BranchEntry, match: MatchDescriptor): boolean {
     const m = match as Record<string, unknown>;
 
     // user("text") match: type='message', role='user', content contains pattern
@@ -236,7 +236,7 @@ Before the `runAuto` function definition (~line 1273), add:
 npx tsc --noEmit
 ```
 
-Expected: No new type errors. `SessionEntry` is imported from the Pi SDK.
+Expected: No new type errors. `BranchEntry` is already defined locally in the test file (line ~1298).
 
 - [ ] **Step 4: Run all tests to verify no regressions**
 
