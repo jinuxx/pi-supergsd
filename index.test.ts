@@ -20,14 +20,12 @@ import registerTaskCommands, {
 
 const path: PathFn = (name, fn, ...children) => ({ name, fn, children });
 
-function setup(h: ReturnType<typeof makeHarness>): void {
-    h.appendUserMessage('main work');
-    h.appendAssistantMessage('working...');
-}
 
 pathSuite('manual workflow', (path) => {
-    const nonInherited = path('push AAA', async (h) => {
-            setup(h);
+    return [
+        path('push AAA', async (h) => {
+            h.appendUserMessage('main work');
+            h.appendAssistantMessage('working...');
             await h.runPushTask('Task AAA');
             assert.strictEqual(h.getStatus(), 'pending task: task-aaa');
             assert.ok(!h.isLlmTriggered());
@@ -358,10 +356,10 @@ pathSuite('manual workflow', (path) => {
                     ),
                 ),
             ),
-        );
-
-    const inherited = path('push AAA [inherit]', async (h) => {
-            setup(h);
+        ),
+        path('push AAA [inherit]', async (h) => {
+            h.appendUserMessage('main work');
+            h.appendAssistantMessage('working...');
             await h.runPushTask('Task AAA', true);
                 assert.strictEqual(h.getStatus(), 'pending task: task-aaa');
                 assert.ok(!h.isLlmTriggered());
@@ -725,10 +723,10 @@ pathSuite('manual workflow', (path) => {
                     ),
                 ),
             ),
-        );
-
-    const startNoTask = path('start AAA [no task]', async (h) => {
-        setup(h);
+        ),
+        path('start AAA [no task]', async (h) => {
+        h.appendUserMessage('main work');
+        h.appendAssistantMessage('working...');
         await h.runStartTask();
         assert.strictEqual(h.getStatus(), undefined);
         assert.ok(!h.isLlmTriggered());
@@ -737,10 +735,10 @@ pathSuite('manual workflow', (path) => {
             assistant('working...'),
             notification('No pending task. Use push-task first.'),
         );
-    });
-
-    const discardNoTask = path('discard AAA [no task]', async (h) => {
-        setup(h);
+    }),
+        path('discard AAA [no task]', async (h) => {
+        h.appendUserMessage('main work');
+        h.appendAssistantMessage('working...');
         await h.runDiscardTask();
         assert.strictEqual(h.getStatus(), undefined);
         assert.ok(!h.isLlmTriggered());
@@ -749,10 +747,10 @@ pathSuite('manual workflow', (path) => {
             assistant('working...'),
             notification('No pending task to discard.'),
         );
-    });
-
-    const finishNoTask = path('finish AAA [no task]', async (h) => {
-        setup(h);
+    }),
+        path('finish AAA [no task]', async (h) => {
+        h.appendUserMessage('main work');
+        h.appendAssistantMessage('working...');
         await h.runFinishTask();
         assert.strictEqual(h.getStatus(), undefined);
         assert.ok(!h.isLlmTriggered());
@@ -761,10 +759,10 @@ pathSuite('manual workflow', (path) => {
             assistant('working...'),
             notification('Not inside task, nothing to finish.'),
         );
-    });
-
-    const abortNoTask = path('abort AAA [no task]', async (h) => {
-        setup(h);
+    }),
+        path('abort AAA [no task]', async (h) => {
+        h.appendUserMessage('main work');
+        h.appendAssistantMessage('working...');
         await h.runAbortTask();
         assert.strictEqual(h.getStatus(), undefined);
         assert.ok(!h.isLlmTriggered());
@@ -773,9 +771,8 @@ pathSuite('manual workflow', (path) => {
             assistant('working...'),
             notification('Not inside task, nothing to abort.'),
         );
-    });
-
-    return [nonInherited, inherited, startNoTask, discardNoTask, finishNoTask, abortNoTask];
+    }),
+    ];
 });
 
 describe('automated workflow', () => {
