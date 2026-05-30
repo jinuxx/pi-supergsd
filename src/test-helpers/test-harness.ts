@@ -1,8 +1,13 @@
 import assert from 'node:assert';
 
 import {
+  AuthStorage,
+  createExtensionRuntime,
+  ExtensionRunner,
+  ModelRegistry,
   SessionManager,
   type ExtensionCommandContext,
+  type ExtensionUIContext,
   type SessionEntry,
   type Theme,
 } from '@earendil-works/pi-coding-agent';
@@ -17,7 +22,6 @@ import {
 } from '../index.js';
 
 import {
-  assumeCommandContext,
   notification,
   type AutoConfig,
   type BranchEntry,
@@ -34,32 +38,48 @@ export class TestHarness {
 
     this.pi = new PiStub(this.sm);
 
-    this.ctx = assumeCommandContext({
-      hasUI: true,
+    this.ctx = this.createCommandContext();
+
+    // Shared auto handler — created once so closure state (running/stopped)
+    // is shared across runAuto and userRunsAuto reaction.
+    this.autoHandler = cmdAuto(this.pi).handler;
+  }
+
+  private createCommandContext(): ExtensionCommandContext {
+    const runner = new ExtensionRunner(
+      [],
+      createExtensionRuntime(),
+      process.cwd(),
+      this.sm,
+      ModelRegistry.inMemory(AuthStorage.inMemory()),
+    );
+
+    runner.setUIContext({
+      notify: (message: string) => {
+        this.trackedHints.push({ text: message, afterEntryId: this.sm.getLeafId() });
+        this.notificationLog.push(message);
+      },
+      setStatus: (key: string, value: string | undefined) => {
+        if (key === 'task') {
+          this.taskStatus = value;
+          this.taskStatusHistory.push(value);
+        }
+      },
+      theme: {
+        fg: (_key: string, text: string) => text,
+        bg: (_key: string, text: string) => text,
+        bold: (text: string) => text,
+      } satisfies Pick<Theme, 'fg' | 'bg' | 'bold'>,
+    } as ExtensionUIContext);
+
+    runner.bindCommandContext({
       waitForIdle: async () => {
         await new Promise<void>((resolve) => {
           this.idleWaiters.push(resolve);
         });
       },
-      hasPendingMessages: () => false,
-      sessionManager: this.sm,
-      ui: {
-        notify: (message: string) => {
-          this.trackedHints.push({ text: message, afterEntryId: this.sm.getLeafId() });
-          this.notificationLog.push(message);
-        },
-        setStatus: (key: string, value: string | undefined) => {
-          if (key === 'task') {
-            this.taskStatus = value;
-            this.taskStatusHistory.push(value);
-          }
-        },
-        theme: {
-          fg: (_key: string, text: string) => text,
-          bg: (_key: string, text: string) => text,
-          bold: (text: string) => text,
-        } satisfies Pick<Theme, 'fg' | 'bg' | 'bold'>,
-      },
+      newSession: async () => ({ cancelled: false }),
+      fork: async () => ({ cancelled: false }),
       navigateTree: async (targetId: string) => {
         if (this.cancelNextNav) {
           this.cancelNextNav = false;
@@ -68,11 +88,11 @@ export class TestHarness {
         this.sm.branch(targetId);
         return { cancelled: false };
       },
+      switchSession: async () => ({ cancelled: false }),
+      reload: async () => {},
     });
 
-    // Shared auto handler — created once so closure state (running/stopped)
-    // is shared across runAuto and userRunsAuto reaction.
-    this.autoHandler = cmdAuto(this.pi).handler;
+    return runner.createCommandContext();
   }
 
   private readonly sm = SessionManager.inMemory();
