@@ -10,7 +10,7 @@ export {
   assumeCommandContext,
 } from './common.js';
 
-export { Harness } from './make-harness.js';
+export { TestHarness } from './test-harness.js';
 
 export { path, pathSuite } from './path-suite.js';
 

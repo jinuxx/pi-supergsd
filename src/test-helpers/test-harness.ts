@@ -26,7 +26,7 @@ import {
 } from './common.js';
 import { extractContentText, makeUserMessage, PiStub } from './pi-stub.js';
 
-export class Harness {
+export class TestHarness {
   constructor() {
     // Seed a non-visible root entry so findFreshTargetId can escape past user messages.
     // Pi always inserts thinking_level_change at session creation (main.js:471).
