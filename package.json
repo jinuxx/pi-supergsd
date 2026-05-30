@@ -28,6 +28,8 @@
   "files": [
     "index.ts",
     "src/index.ts",
+    "src/slug.ts",
+    "src/text-content.ts",
     "skills",
     "README.md",
     "LICENSE"
