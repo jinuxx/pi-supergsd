@@ -802,6 +802,8 @@ describe('automated workflow', () => {
       notification('Task finished. Last response attached.'),
     );
     assert.ok(h.isLlmTriggered());
+    // Status line should be clean — no stale [auto] prefix remains.
+    assert.strictEqual(h.getStatus(), undefined);
   });
 
   it('returns the branch result to the original leaf for branch-context tasks', async () => {
