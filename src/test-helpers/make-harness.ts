@@ -2,7 +2,6 @@ import assert from 'node:assert';
 
 import {
   SessionManager,
-  type ExtensionAPI,
   type ExtensionCommandContext,
   type SessionEntry,
   type Theme,
@@ -25,6 +24,7 @@ import {
   type MatchDescriptor,
   type ReactionDescriptor,
 } from './common.js';
+import { extractContentText, makeUserMessage, PiStub } from './pi-stub.js';
 
 export class Harness {
   constructor() {
@@ -32,38 +32,7 @@ export class Harness {
     // Pi always inserts thinking_level_change at session creation (main.js:471).
     this.sm.appendThinkingLevelChange('off');
 
-    this.pi = {
-      appendEntry: (customType: string, data?: unknown) => {
-        this.sm.appendCustomEntry(customType, data);
-      },
-      sendUserMessage: (content: Parameters<ExtensionAPI['sendUserMessage']>[0]) => {
-        const text = extractContentText(content) ?? '';
-        this.sm.appendMessage(makeUserMessage(text, Date.now()));
-        const branch = this.sm.getBranch();
-        const last = branch[branch.length - 1];
-        if (last) this.triggeredUserMessages.add(last.id);
-      },
-      sendMessage: (
-        message: Parameters<ExtensionAPI['sendMessage']>[0],
-        options?: Parameters<ExtensionAPI['sendMessage']>[1],
-      ) => {
-        this.sm.appendCustomMessageEntry(
-          message.customType,
-          message.content,
-          message.display ?? true,
-          message.details,
-        );
-
-        if (options?.triggerTurn) {
-          const branch = this.sm.getBranch();
-          const last = branch[branch.length - 1];
-          if (last) this.triggeredCustomMessages.add(last.id);
-        }
-      },
-      on: (eventName: string, handler: () => unknown) => {
-        if (eventName === 'session_shutdown') this.sessionShutdownHandlers.push(handler);
-      },
-    };
+    this.pi = new PiStub(this.sm);
 
     this.ctx = assumeCommandContext({
       hasUI: true,
@@ -108,15 +77,12 @@ export class Harness {
 
   private readonly sm = SessionManager.inMemory();
   private readonly idleWaiters: Array<() => void> = [];
-  private readonly sessionShutdownHandlers: Array<() => unknown> = [];
-  private readonly triggeredCustomMessages = new Set<string>();
-  private readonly triggeredUserMessages = new Set<string>();
   private readonly trackedHints: Array<{ text: string; afterEntryId: string | null }> = [];
   private readonly notificationLog: string[] = [];
   private readonly taskStatusHistory: Array<string | undefined> = [];
   private cancelNextNav = false;
   private taskStatus: string | undefined;
-  private readonly pi: Parameters<typeof cmdAuto>[0] & Parameters<typeof toolPushTask>[0];
+  private readonly pi: PiStub;
   private readonly ctx: ExtensionCommandContext;
   private readonly autoHandler: ReturnType<typeof cmdAuto>['handler'];
 
@@ -128,9 +94,9 @@ export class Harness {
     for (let i = branch.length - 1; i >= 0; i--) {
       const entry = branch[i];
       if (entry.type === 'custom') continue;
-      if (entry.type === 'message' && entry.message.role === 'user') return this.triggeredUserMessages.has(entry.id);
+      if (entry.type === 'message' && entry.message.role === 'user') return this.pi.isTriggeredUserMessage(entry.id);
       if (entry.type === 'message' && entry.message.role === 'assistant') return false;
-      if (entry.type === 'custom_message') return this.triggeredCustomMessages.has(entry.id);
+      if (entry.type === 'custom_message') return this.pi.isTriggeredCustomMessage(entry.id);
       return false;
     }
 
@@ -415,9 +381,7 @@ export class Harness {
 
     // --- user-ctrl-c reaction: trigger session shutdown ---
     if (reaction.type === 'user-ctrl-c') {
-      for (const handler of this.sessionShutdownHandlers) {
-        handler();
-      }
+      this.pi.triggerSessionShutdown();
       return;
     }
 
@@ -453,10 +417,6 @@ export class Harness {
 }
 
 type TaskCommand = { handler: (args: string, ctx: ExtensionCommandContext) => Promise<void> };
-
-function makeUserMessage(text: string, timestamp = 0): AppendedMessage {
-  return { role: 'user', content: [{ type: 'text', text }], timestamp };
-}
 
 function makeAssistantMessage(
   text: string,
@@ -503,15 +463,6 @@ function readTaskResultSlug(details: unknown): string | null {
   return isRecord(details) && typeof details.slug === 'string' ? details.slug : null;
 }
 
-function extractContentText(content: unknown): string | null {
-  if (typeof content === 'string') return content;
-  if (!Array.isArray(content)) return null;
-  return content
-    .filter(isTextBlock)
-    .map(block => block.text)
-    .join('');
-}
-
 function normalizeStopReason(stopReason?: string): AssistantAppendedMessage['stopReason'] {
   switch (stopReason) {
     case 'length':
@@ -523,12 +474,6 @@ function normalizeStopReason(stopReason?: string): AssistantAppendedMessage['sto
       return 'stop';
   }
 }
-
-function isTextBlock(value: unknown): value is TextBlock {
-  return isRecord(value) && value.type === 'text' && typeof value.text === 'string';
-}
-
-type TextBlock = { type: 'text'; text: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
