@@ -3,27 +3,22 @@ import { it } from 'node:test';
 import { TestHarness } from './test-harness.js';
 
 export function node(name: string, fn: NodeFn) {
-  return new PathBuilder(name, fn);
-}
-
-export interface TestNode {
-  children(...children: TestNode[]): TestNode;
-  run(): void;
+  return new TestNode(name, fn);
 }
 
 type NodeFn = (h: TestHarness) => Promise<void> | void;
 
-class PathBuilder implements TestNode {
+class TestNode {
   constructor(
     private readonly name: string,
     private readonly fn?: NodeFn,
   ) {}
 
-  private readonly childPaths: PathBuilder[] = [];
+  private readonly childPaths: TestNode[] = [];
   private registered = false;
 
   children(...children: TestNode[]): TestNode {
-    this.childPaths.push(...children.map(asPathBuilder));
+    this.childPaths.push(...children);
     return this;
   }
 
@@ -31,7 +26,7 @@ class PathBuilder implements TestNode {
     this.register([]);
   }
 
-  private register(ancestors: PathBuilder[]): void {
+  private register(ancestors: TestNode[]): void {
     if (this.registered) {
       throw new Error(`Path "${this.name}" has already been registered`);
     }
@@ -53,12 +48,4 @@ class PathBuilder implements TestNode {
       child.register(chain);
     }
   }
-}
-
-function asPathBuilder(node: TestNode): PathBuilder {
-  if (!(node instanceof PathBuilder)) {
-    throw new TypeError('path().children() only accepts nodes returned by path()');
-  }
-
-  return node;
 }
