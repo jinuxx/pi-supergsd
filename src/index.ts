@@ -191,7 +191,7 @@ export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
   };
 }
 
-export const rendererTaskResult: MessageRenderer<{ slug?: string; sourceEntryId?: string }> = (message, _options, theme): Box => {
+export const rendererTaskResult: MessageRenderer<{ slug?: string }> = (message, _options, theme): Box => {
   const label = message.details?.slug
       ? theme.fg('customMessageLabel', `${message.details.slug} result:`)
       : theme.fg('customMessageLabel', 'result:');
@@ -254,7 +254,7 @@ async function startTask(
     return;
   }
 
-  const inheritContext = activeTask.data.inherit_context ?? false;
+  const inheritContext = activeTask.data.inherit_context;
 
   if (!inheritContext) {
     const departureLeafId = ctx.sessionManager.getLeafId()!;
@@ -347,7 +347,7 @@ async function finishTask(
       // Content is filtered to only TextContent blocks (or original string)
       content: lastAssistantContent,
       display: true,
-      details: { sourceEntryId: lastAssistantId, slug },
+      details: { slug },
     }, { triggerTurn: true });
   }
 
@@ -525,7 +525,6 @@ function currentTask(
  * and SessionManager (full mutable version).
  */
 interface ReadonlySessionLike {
-  getEntries(): SessionEntry[];
   getLeafId(): string | null;
   getBranch(): SessionEntry[];
 }

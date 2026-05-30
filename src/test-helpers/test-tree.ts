@@ -6,9 +6,9 @@ export function node(name: string, fn: NodeFn) {
   return new TestNode(name, fn);
 }
 
-export type NodeFn = (h: TestHarness) => Promise<void> | void;
+type NodeFn = (h: TestHarness) => Promise<void> | void;
 
-export class TestNode {
+class TestNode {
   constructor(
     private readonly name: string,
     private readonly fn?: NodeFn,
