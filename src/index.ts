@@ -14,6 +14,8 @@ import { Box, Text } from '@earendil-works/pi-tui';
 
 import { Type, type Static } from 'typebox';
 
+import { makeSlug } from './slug.js';
+
 export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
   return defineTool({
     name: 'push-task',
@@ -579,40 +581,6 @@ interface TaskStartData {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
-
-function makeSlug(prompt: string): string {
-  const words = prompt.split(/\s+/)
-    .filter(w => !STOPWORDS.has(w.toLowerCase()))
-    .map(w => w.toLowerCase().replace(/^[^\w]+|[^\w]+$/g, ''))
-    .filter(w => w.length > 0);
-  if (words.length === 0) return '<no description>';
-
-  let result = words[0]!;
-  for (let i = 1; i < Math.min(words.length, 7); i++) {
-    const next = `-${words[i]}`;
-    if ((result + next).length <= 40 || result.length <= 40 - next.length) {
-      result += next;
-    } else {
-      break;
-    }
-  }
-  return result;
-}
-
-const STOPWORDS = new Set([
-  'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
-  'should', 'may', 'might', 'must', 'can', 'could', 'i', 'you', 'he',
-  'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my',
-  'your', 'his', 'its', 'our', 'their', 'this', 'that', 'these', 'those',
-  'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as',
-  'into', 'through', 'during', 'before', 'after', 'above', 'below',
-  'between', 'under', 'and', 'but', 'or', 'nor', 'not', 'so', 'if',
-  'than', 'too', 'very', 'just', 'now', 'then', 'also', 'here', 'there',
-  'when', 'where', 'why', 'how', 'all', 'both', 'each', 'few', 'more',
-  'most', 'other', 'some', 'such', 'no', 'only', 'own', 'same', 'up',
-  'out', 'about', 'over', 'again', 'while',
-]);
 
 /** Extract a plain text string from content that may be a string or an array of text blocks. */
 function extractTextContent(content: unknown): string {
