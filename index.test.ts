@@ -833,22 +833,17 @@ describe('automated workflow', () => {
   });
 
   it('stops when navigation is cancelled and does not mark the task done', async () => {
-    const { appendUserMessage, assertBranchHistory, isLlmTriggered, setCancelNextNav, releaseNextIdle, flushMicrotasks, runPushTask, legacyRunAuto } =
-      makeHarness();
+    const h = makeHarness();
 
-    appendUserMessage('main work');
-    await runPushTask('Analyze performance.');
+    h.appendUserMessage('main work');
+    await h.runPushTask('Analyze performance.');
 
-    setCancelNextNav(true);
+    await h.runAuto({
+      reactions: [[task('Analyze performance.'), userEsc()]],
+    });
 
-    const running = legacyRunAuto();
-
-    await flushMicrotasks();
-    await releaseNextIdle();
-    await running;
-    assert.ok(!isLlmTriggered());
-    // Navigation was cancelled, so no task-start was added
-    assertBranchHistory(
+    assert.ok(!h.isLlmTriggered());
+    h.assertBranchHistory(
       user('main work'),
       task('Analyze performance.'),
       notification('Task stored. Use `/start-task` or `/auto` to start it.'),
