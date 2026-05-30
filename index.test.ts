@@ -897,7 +897,8 @@ describe('automated workflow', () => {
 
     await h.runAuto({
       reactions: [
-        [task('Implement phase 1.'), assistant('Stopped by user.', 'aborted')],
+        [user('Implement phase 1'), assistant('Stopped by user.')],
+        [assistant('Stopped by user.'), userEsc()],
       ],
     });
 
