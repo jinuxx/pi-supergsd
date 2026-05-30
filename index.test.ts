@@ -1307,10 +1307,17 @@ function makeHarness() {
   };
 }
 
-// ── Auto test types (Phase 1: placeholders for future phases) ───
+// ── Auto test types ─────────────────────────────────────────────
 
-type MatchDescriptor = Record<string, unknown>;
-type ReactionDescriptor = Record<string, unknown>;
+/** Entry kinds that can appear in a reaction pair's match slot. */
+type MatchDescriptor =
+  | Partial<BranchEntry>   // user(), assistant(), task() helpers produce these
+  ;
+
+/** Entry kinds that can appear in a reaction pair's reaction slot. */
+type ReactionDescriptor =
+  | Partial<BranchEntry>   // assistant(), user(), task() helpers produce these
+  ;
 
 interface AutoConfig {
   reactions?: Array<[MatchDescriptor, ReactionDescriptor]>;
