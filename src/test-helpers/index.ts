@@ -10,7 +10,7 @@ export {
   assumeCommandContext,
 } from './common.js';
 
-export { makeHarness } from './make-harness.js';
+export { Harness } from './make-harness.js';
 
 export { path, pathSuite } from './path-suite.js';
 
@@ -22,6 +22,5 @@ export type {
   NotificationEntry,
 } from './common.js';
 
-export type { Harness } from './make-harness.js';
 
 export type { PathNode, PathFn } from './path-suite.js';
