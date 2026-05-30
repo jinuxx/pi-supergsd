@@ -2,38 +2,63 @@ import { it } from 'node:test';
 
 import { TestHarness } from './test-harness.js';
 
-export function pathSuite(...roots: PathNode[]): void {
-  function registerTests(node: PathNode, ancestors: PathNode[]): void {
-    const chain = [...ancestors, node];
-    const name = chain.map(n => n.name).join(' → ');
+export const path: PathFn = (name, fn) => new PathBuilder(name, fn);
+
+export type PathFn = (name: string, fn?: PathStep) => PathNode;
+
+export interface PathNode {
+  children(...children: PathNode[]): PathNode;
+  run(): void;
+}
+
+type PathStep = (h: TestHarness) => Promise<void> | void;
+
+class PathBuilder implements PathNode {
+  constructor(
+    private readonly name: string,
+    private readonly fn?: PathStep,
+  ) {}
+
+  private readonly childPaths: PathBuilder[] = [];
+  private registered = false;
+
+  children(...children: PathNode[]): PathNode {
+    this.childPaths.push(...children.map(asPathBuilder));
+    return this;
+  }
+
+  run(): void {
+    this.register([]);
+  }
+
+  private register(ancestors: PathBuilder[]): void {
+    if (this.registered) {
+      throw new Error(`Path "${this.name}" has already been registered`);
+    }
+
+    this.registered = true;
+
+    const chain = [...ancestors, this];
+    const name = chain.map(node => node.name).join(' → ');
 
     it(name, async () => {
       const h = new TestHarness();
-      for (const ancestor of chain) {
-        await ancestor.fn?.(h);
+
+      for (const node of chain) {
+        await node.fn?.(h);
       }
     });
 
-    for (const child of node.children) {
-      registerTests(child, chain);
+    for (const child of this.childPaths) {
+      child.register(chain);
     }
-  }
-
-  for (const root of roots) {
-    registerTests(root, []);
   }
 }
 
-export const path: PathFn = (name, fn, ...children) => ({ name, fn, children });
+function asPathBuilder(node: PathNode): PathBuilder {
+  if (!(node instanceof PathBuilder)) {
+    throw new TypeError('path().children() only accepts nodes returned by path()');
+  }
 
-export type PathFn = (
-  name: string,
-  fn?: (h: TestHarness) => Promise<void> | void,
-  ...children: PathNode[]
-) => PathNode;
-
-export interface PathNode {
-  name: string;
-  fn?: (h: TestHarness) => Promise<void> | void;
-  children: PathNode[];
+  return node;
 }

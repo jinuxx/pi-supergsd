@@ -12,7 +12,7 @@ export {
 
 export { TestHarness } from './test-harness.js';
 
-export { path, pathSuite } from './path-suite.js';
+export { path } from './path-suite.js';
 
 export type {
   BranchEntry,
