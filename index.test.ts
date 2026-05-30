@@ -1265,24 +1265,7 @@ function makeHarness() {
     }
   }
 
-  async function flushMicrotasks() {
-    await Promise.resolve();
-    await Promise.resolve();
-  }
 
-  async function emitSessionShutdown() {
-    for (const handler of sessionShutdownHandlers) {
-      await handler();
-    }
-  }
-
-  function setPendingMessages(value: boolean) {
-    pendingMessages = value;
-  }
-
-  function setCancelNextNav(v: boolean) {
-    cancelNextNav = v;
-  }
 
   // ── Convenience wrappers (pre-bound to pi / ctx) ───────────────
 
@@ -1306,16 +1289,14 @@ function makeHarness() {
   registerTaskCommands(pi);
 
   // Shared auto handler — created once so closure state (running/stopped)
-  // is shared across runAuto, legacyRunAuto, and userRunsAuto reaction.
+  // is shared across runAuto and userRunsAuto reaction.
   // Must be created before registerTaskCommands so the primary closure owns
   // the session_shutdown handler (registerTaskCommands internally calls
   // createAutoCommand again, but its handler is discarded by the mock; the
   // extra shutdown handler from that call is harmless).
   const autoHandler = createAutoCommand(pi).handler;
 
-  function legacyRunAuto(): Promise<void> {
-    return autoHandler('', ctx) as Promise<void>;
-  }
+
 
   /**
    * Scan branch entries not yet in the seenIds set and apply the first
@@ -1528,17 +1509,11 @@ function makeHarness() {
     getStatus,
     appendUserMessage,
     appendAssistantMessage,
-    releaseNextIdle,
-    flushMicrotasks,
-    emitSessionShutdown,
-    setPendingMessages,
-    setCancelNextNav,
     runPushTask,
     runStartTask,
     runFinishTask,
     runDiscardTask,
     runAbortTask,
-    legacyRunAuto,
     runAuto,
   };
 }
