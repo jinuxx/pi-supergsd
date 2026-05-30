@@ -1321,9 +1321,16 @@ function makeHarness() {
   function applyReaction(session: SessionManager, reaction: ReactionDescriptor): void {
     const r = reaction as Record<string, unknown>;
 
-    // assistant("text") reaction: inject an assistant message
+    // --- user-esc reaction: cancel next navigation ---
+    if (r.type === 'user-esc') {
+      cancelNextNav = true;
+      return;
+    }
+
+    // --- message-type reactions (assistant, user) ---
     if (r.type === 'message' && r.message && typeof r.message === 'object') {
       const msg = r.message as Record<string, unknown>;
+
       if (msg.role === 'assistant') {
         const text = extractContentText(msg.content) ?? '';
         session.appendMessage({
@@ -1333,6 +1340,7 @@ function makeHarness() {
           model: 'test',
           provider: 'test',
         } as Parameters<typeof session.appendMessage>[0]);
+        return;
       }
     }
   }
@@ -1353,7 +1361,9 @@ function makeHarness() {
   async function runAuto(config: AutoConfig): Promise<void> {
     const reactions = config.reactions ?? [];
     let settled = false;
-    const seenIds = new Set<string>(sm.getBranch().map(e => e.id));
+    // Start with empty seen set so the first scan covers all pre-existing entries.
+    // This is needed for user-esc tests where the task entry exists before auto runs.
+    const seenIds = new Set<string>();
 
     const handlerPromise = createAutoCommand(pi).handler('', ctx).finally(() => { settled = true; });
 
@@ -1363,12 +1373,13 @@ function makeHarness() {
 
       const waiter = idleWaiters.shift();
       if (waiter) {
+        // Scan BEFORE resolving idle: reactions can set cancelNextNav to affect
+        // the navigation that auto's handler is about to make.
+        scanAndReact(sm, reactions, seenIds);
+
         waiter();
         for (let i = 0; i < 10; i++) await Promise.resolve();
       }
-
-      // After idle resolution, scan for new entries and apply matching reactions
-      scanAndReact(sm, reactions, seenIds);
     }
 
     if (!settled) {
