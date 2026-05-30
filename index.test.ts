@@ -1264,6 +1264,30 @@ function makeHarness() {
     return createAutoCommand(pi).handler('', ctx) as Promise<void>;
   }
 
+  async function runAuto(_config: AutoConfig): Promise<void> {
+    let settled = false;
+    const handlerPromise = createAutoCommand(pi).handler('', ctx).finally(() => { settled = true; });
+
+    const MAX_STEPS = 100;
+    for (let steps = 0; steps < MAX_STEPS && !settled; steps++) {
+      // Yield so any pending microtasks from the handler flush
+      await Promise.resolve();
+
+      const waiter = idleWaiters.shift();
+      if (waiter) {
+        waiter();
+        // Drain microtasks so the handler body executes past the resolved await
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+      }
+    }
+
+    if (!settled) {
+      throw new Error('runAuto did not complete within step cap');
+    }
+
+    await handlerPromise;
+  }
+
   function getStatus(): string | undefined {
     return taskStatus;
   }
@@ -1285,7 +1309,17 @@ function makeHarness() {
     runDiscardTask,
     runAbortTask,
     legacyRunAuto,
+    runAuto,
   };
+}
+
+// ── Auto test types (Phase 1: placeholders for future phases) ───
+
+type MatchDescriptor = Record<string, unknown>;
+type ReactionDescriptor = Record<string, unknown>;
+
+interface AutoConfig {
+  reactions?: Array<[MatchDescriptor, ReactionDescriptor]>;
 }
 
 
