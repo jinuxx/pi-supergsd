@@ -2,27 +2,27 @@ import { it } from 'node:test';
 
 import { TestHarness } from './test-harness.js';
 
-export const path: PathFn = (name, fn) => new PathBuilder(name, fn);
+export function node(name: string, fn: NodeFn) {
+  return new PathBuilder(name, fn);
+}
 
-export type PathFn = (name: string, fn?: PathStep) => PathNode;
-
-export interface PathNode {
-  children(...children: PathNode[]): PathNode;
+export interface TestNode {
+  children(...children: TestNode[]): TestNode;
   run(): void;
 }
 
-type PathStep = (h: TestHarness) => Promise<void> | void;
+type NodeFn = (h: TestHarness) => Promise<void> | void;
 
-class PathBuilder implements PathNode {
+class PathBuilder implements TestNode {
   constructor(
     private readonly name: string,
-    private readonly fn?: PathStep,
+    private readonly fn?: NodeFn,
   ) {}
 
   private readonly childPaths: PathBuilder[] = [];
   private registered = false;
 
-  children(...children: PathNode[]): PathNode {
+  children(...children: TestNode[]): TestNode {
     this.childPaths.push(...children.map(asPathBuilder));
     return this;
   }
@@ -55,7 +55,7 @@ class PathBuilder implements PathNode {
   }
 }
 
-function asPathBuilder(node: PathNode): PathBuilder {
+function asPathBuilder(node: TestNode): PathBuilder {
   if (!(node instanceof PathBuilder)) {
     throw new TypeError('path().children() only accepts nodes returned by path()');
   }

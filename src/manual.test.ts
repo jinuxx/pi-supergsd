@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import {
   assistant,
   notification,
-  path,
+  node,
   task,
   taskResult,
   user,
@@ -12,7 +12,7 @@ import {
 import { describe } from 'node:test';
 
 describe('manual workflow', () => {
-  path('push AAA', async (h) => {
+  node('push AAA', async (h) => {
     h.appendUserMessage('main work');
     h.appendAssistantMessage('working...');
     await h.runPushTask('Task AAA');
@@ -25,7 +25,7 @@ describe('manual workflow', () => {
       notification('Task stored. Use `/start-task` or `/auto` to start it.'),
     );
   }).children(
-    path('discard AAA', async (h) => {
+    node('discard AAA', async (h) => {
       await h.runDiscardTask();
       assert.strictEqual(h.getStatus(), undefined);
       assert.ok(!h.isLlmTriggered());
@@ -36,7 +36,7 @@ describe('manual workflow', () => {
         notification('Task discarded.'),
       );
     }),
-    path('start AAA', async (h) => {
+    node('start AAA', async (h) => {
       await h.runStartTask();
       assert.strictEqual(h.getStatus(), 'current task: task-aaa');
       assert.ok(h.isLlmTriggered());
@@ -44,7 +44,7 @@ describe('manual workflow', () => {
         user('Task AAA'),
       );
     }).children(
-      path('finish AAA', async (h) => {
+      node('finish AAA', async (h) => {
         h.appendAssistantMessage('Done.');
         await h.runFinishTask();
         assert.strictEqual(h.getStatus(), undefined);
@@ -57,7 +57,7 @@ describe('manual workflow', () => {
           notification('Task finished. Last response attached.'),
         );
       }).children(
-        path('start [no task]', async (h) => {
+        node('start [no task]', async (h) => {
           await h.runStartTask();
           assert.strictEqual(h.getStatus(), undefined);
           assert.ok(h.isLlmTriggered());
@@ -69,7 +69,7 @@ describe('manual workflow', () => {
             notification('No pending task. Use push-task first.'),
           );
         }),
-        path('discard [no task]', async (h) => {
+        node('discard [no task]', async (h) => {
           await h.runDiscardTask();
           assert.strictEqual(h.getStatus(), undefined);
           assert.ok(h.isLlmTriggered());
@@ -81,7 +81,7 @@ describe('manual workflow', () => {
             notification('No pending task to discard.'),
           );
         }),
-        path('finish [no task]', async (h) => {
+        node('finish [no task]', async (h) => {
           await h.runFinishTask();
           assert.strictEqual(h.getStatus(), undefined);
           assert.ok(h.isLlmTriggered());
@@ -93,7 +93,7 @@ describe('manual workflow', () => {
             notification('Not inside task, nothing to finish.'),
           );
         }),
-        path('abort [no task]', async (h) => {
+        node('abort [no task]', async (h) => {
           await h.runAbortTask();
           assert.strictEqual(h.getStatus(), undefined);
           assert.ok(h.isLlmTriggered());
@@ -106,7 +106,7 @@ describe('manual workflow', () => {
           );
         }),
       ),
-      path('abort AAA', async (h) => {
+      node('abort AAA', async (h) => {
         h.appendAssistantMessage('Partial...');
         await h.runAbortTask();
         assert.strictEqual(h.getStatus(), 'pending task: task-aaa');
@@ -118,7 +118,7 @@ describe('manual workflow', () => {
           notification('Task aborted. Branch abandoned without summary.'),
         );
       }).children(
-        path('start AAA', async (h) => {
+        node('start AAA', async (h) => {
           await h.runStartTask();
           assert.strictEqual(h.getStatus(), 'current task: task-aaa');
           assert.ok(h.isLlmTriggered());
@@ -126,7 +126,7 @@ describe('manual workflow', () => {
             user('Task AAA'),
           );
         }).children(
-          path('finish AAA', async (h) => {
+          node('finish AAA', async (h) => {
             h.appendAssistantMessage('Done.');
             await h.runFinishTask();
             assert.strictEqual(h.getStatus(), undefined);
@@ -141,7 +141,7 @@ describe('manual workflow', () => {
           }),
         ),
       ),
-      path('push BBB', async (h) => {
+      node('push BBB', async (h) => {
         h.appendAssistantMessage('some more work');
         await h.runPushTask('Task BBB');
         assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
@@ -153,7 +153,7 @@ describe('manual workflow', () => {
           notification('Task stored. Use `/start-task` or `/auto` to start it.'),
         );
       }).children(
-        path('discard BBB', async (h) => {
+        node('discard BBB', async (h) => {
           await h.runDiscardTask();
           assert.strictEqual(h.getStatus(), 'current task: task-aaa');
           assert.ok(!h.isLlmTriggered());
@@ -164,7 +164,7 @@ describe('manual workflow', () => {
             notification('Task discarded.'),
           );
         }).children(
-          path('finish AAA', async (h) => {
+          node('finish AAA', async (h) => {
             h.appendAssistantMessage('Done.');
             await h.runFinishTask();
             assert.strictEqual(h.getStatus(), undefined);
@@ -178,7 +178,7 @@ describe('manual workflow', () => {
             );
           }),
         ),
-        path('start BBB', async (h) => {
+        node('start BBB', async (h) => {
           await h.runStartTask();
           assert.strictEqual(h.getStatus(), 'current task: task-bbb');
           assert.ok(h.isLlmTriggered());
@@ -186,7 +186,7 @@ describe('manual workflow', () => {
             user('Task BBB'),
           );
         }).children(
-          path('finish BBB', async (h) => {
+          node('finish BBB', async (h) => {
             h.appendAssistantMessage('inner done');
             await h.runFinishTask();
             assert.strictEqual(h.getStatus(), 'current task: task-aaa');
@@ -199,7 +199,7 @@ describe('manual workflow', () => {
               notification('Task finished. Last response attached.'),
             );
           }).children(
-            path('finish AAA', async (h) => {
+            node('finish AAA', async (h) => {
               h.appendAssistantMessage('Done.');
               await h.runFinishTask();
               assert.strictEqual(h.getStatus(), undefined);
@@ -213,7 +213,7 @@ describe('manual workflow', () => {
               );
             }),
           ),
-          path('abort BBB', async (h) => {
+          node('abort BBB', async (h) => {
             h.appendAssistantMessage('partial inner');
             await h.runAbortTask();
             assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
@@ -225,7 +225,7 @@ describe('manual workflow', () => {
               notification('Task aborted. Branch abandoned without summary.'),
             );
           }).children(
-            path('finish AAA', async (h) => {
+            node('finish AAA', async (h) => {
               h.appendAssistantMessage('Done.');
               await h.runFinishTask();
               assert.strictEqual(h.getStatus(), undefined);
@@ -241,7 +241,7 @@ describe('manual workflow', () => {
           ),
         ),
       ),
-      path('push BBB [inherit]', async (h) => {
+      node('push BBB [inherit]', async (h) => {
         h.appendAssistantMessage('some more work');
         await h.runPushTask('Task BBB', true);
         assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
@@ -253,7 +253,7 @@ describe('manual workflow', () => {
           notification('Task stored. Use `/start-task` or `/auto` to start it.'),
         );
       }).children(
-        path('discard BBB [inherit]', async (h) => {
+        node('discard BBB [inherit]', async (h) => {
           await h.runDiscardTask();
           assert.strictEqual(h.getStatus(), 'current task: task-aaa');
           assert.ok(!h.isLlmTriggered());
@@ -264,7 +264,7 @@ describe('manual workflow', () => {
             notification('Task discarded.'),
           );
         }).children(
-          path('finish AAA', async (h) => {
+          node('finish AAA', async (h) => {
             h.appendAssistantMessage('Done.');
             await h.runFinishTask();
             assert.strictEqual(h.getStatus(), undefined);
@@ -278,7 +278,7 @@ describe('manual workflow', () => {
             );
           }),
         ),
-        path('start BBB [inherit]', async (h) => {
+        node('start BBB [inherit]', async (h) => {
           await h.runStartTask();
           assert.strictEqual(h.getStatus(), 'current task: task-bbb');
           assert.ok(h.isLlmTriggered());
@@ -289,7 +289,7 @@ describe('manual workflow', () => {
             user('Task BBB'),
           );
         }).children(
-          path('finish BBB [inherit]', async (h) => {
+          node('finish BBB [inherit]', async (h) => {
             h.appendAssistantMessage('inner done');
             await h.runFinishTask();
             assert.strictEqual(h.getStatus(), 'current task: task-aaa');
@@ -302,7 +302,7 @@ describe('manual workflow', () => {
               notification('Task finished. Last response attached.'),
             );
           }).children(
-            path('finish AAA', async (h) => {
+            node('finish AAA', async (h) => {
               h.appendAssistantMessage('Done.');
               await h.runFinishTask();
               assert.strictEqual(h.getStatus(), undefined);
@@ -316,7 +316,7 @@ describe('manual workflow', () => {
               );
             }),
           ),
-          path('abort BBB [inherit]', async (h) => {
+          node('abort BBB [inherit]', async (h) => {
             h.appendAssistantMessage('partial inner');
             await h.runAbortTask();
             assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
@@ -328,7 +328,7 @@ describe('manual workflow', () => {
               notification('Task aborted. Branch abandoned without summary.'),
             );
           }).children(
-            path('finish AAA', async (h) => {
+            node('finish AAA', async (h) => {
               h.appendAssistantMessage('Done.');
               await h.runFinishTask();
               assert.strictEqual(h.getStatus(), undefined);
@@ -347,7 +347,7 @@ describe('manual workflow', () => {
     ),
   ).run();
 
-  path('push AAA [inherit]', async (h) => {
+  node('push AAA [inherit]', async (h) => {
     h.appendUserMessage('main work');
     h.appendAssistantMessage('working...');
     await h.runPushTask('Task AAA', true);
@@ -360,7 +360,7 @@ describe('manual workflow', () => {
       notification('Task stored. Use `/start-task` or `/auto` to start it.'),
     );
   }).children(
-    path('discard AAA', async (h) => {
+    node('discard AAA', async (h) => {
       await h.runDiscardTask();
       assert.strictEqual(h.getStatus(), undefined);
       assert.ok(!h.isLlmTriggered());
@@ -371,7 +371,7 @@ describe('manual workflow', () => {
         notification('Task discarded.'),
       );
     }),
-    path('start AAA', async (h) => {
+    node('start AAA', async (h) => {
       await h.runStartTask();
       assert.strictEqual(h.getStatus(), 'current task: task-aaa');
       assert.ok(h.isLlmTriggered());
@@ -382,7 +382,7 @@ describe('manual workflow', () => {
         user('Task AAA'),
       );
     }).children(
-      path('finish AAA', async (h) => {
+      node('finish AAA', async (h) => {
         h.appendAssistantMessage('Done.');
         await h.runFinishTask();
         assert.strictEqual(h.getStatus(), undefined);
@@ -395,7 +395,7 @@ describe('manual workflow', () => {
           notification('Task finished. Last response attached.'),
         );
       }).children(
-        path('start [no task]', async (h) => {
+        node('start [no task]', async (h) => {
           await h.runStartTask();
           assert.strictEqual(h.getStatus(), undefined);
           assert.ok(h.isLlmTriggered());
@@ -407,7 +407,7 @@ describe('manual workflow', () => {
             notification('No pending task. Use push-task first.'),
           );
         }),
-        path('discard [no task]', async (h) => {
+        node('discard [no task]', async (h) => {
           await h.runDiscardTask();
           assert.strictEqual(h.getStatus(), undefined);
           assert.ok(h.isLlmTriggered());
@@ -419,7 +419,7 @@ describe('manual workflow', () => {
             notification('No pending task to discard.'),
           );
         }),
-        path('finish [no task]', async (h) => {
+        node('finish [no task]', async (h) => {
           await h.runFinishTask();
           assert.strictEqual(h.getStatus(), undefined);
           assert.ok(h.isLlmTriggered());
@@ -431,7 +431,7 @@ describe('manual workflow', () => {
             notification('Not inside task, nothing to finish.'),
           );
         }),
-        path('abort [no task]', async (h) => {
+        node('abort [no task]', async (h) => {
           await h.runAbortTask();
           assert.strictEqual(h.getStatus(), undefined);
           assert.ok(h.isLlmTriggered());
@@ -444,7 +444,7 @@ describe('manual workflow', () => {
           );
         }),
       ),
-      path('abort AAA', async (h) => {
+      node('abort AAA', async (h) => {
         h.appendAssistantMessage('Partial...');
         await h.runAbortTask();
         assert.strictEqual(h.getStatus(), 'pending task: task-aaa');
@@ -456,7 +456,7 @@ describe('manual workflow', () => {
           notification('Task aborted. Branch abandoned without summary.'),
         );
       }).children(
-        path('start AAA', async (h) => {
+        node('start AAA', async (h) => {
           await h.runStartTask();
           assert.strictEqual(h.getStatus(), 'current task: task-aaa');
           assert.ok(h.isLlmTriggered());
@@ -467,7 +467,7 @@ describe('manual workflow', () => {
             user('Task AAA'),
           );
         }).children(
-          path('finish AAA', async (h) => {
+          node('finish AAA', async (h) => {
             h.appendAssistantMessage('Done.');
             await h.runFinishTask();
             assert.strictEqual(h.getStatus(), undefined);
@@ -482,7 +482,7 @@ describe('manual workflow', () => {
           }),
         ),
       ),
-      path('push BBB', async (h) => {
+      node('push BBB', async (h) => {
         h.appendAssistantMessage('some more work');
         await h.runPushTask('Task BBB');
         assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
@@ -497,7 +497,7 @@ describe('manual workflow', () => {
           notification('Task stored. Use `/start-task` or `/auto` to start it.'),
         );
       }).children(
-        path('discard BBB', async (h) => {
+        node('discard BBB', async (h) => {
           await h.runDiscardTask();
           assert.strictEqual(h.getStatus(), 'current task: task-aaa');
           assert.ok(!h.isLlmTriggered());
@@ -511,7 +511,7 @@ describe('manual workflow', () => {
             notification('Task discarded.'),
           );
         }).children(
-          path('finish AAA', async (h) => {
+          node('finish AAA', async (h) => {
             h.appendAssistantMessage('Done.');
             await h.runFinishTask();
             assert.strictEqual(h.getStatus(), undefined);
@@ -525,7 +525,7 @@ describe('manual workflow', () => {
             );
           }),
         ),
-        path('start BBB', async (h) => {
+        node('start BBB', async (h) => {
           await h.runStartTask();
           assert.strictEqual(h.getStatus(), 'current task: task-bbb');
           assert.ok(h.isLlmTriggered());
@@ -533,7 +533,7 @@ describe('manual workflow', () => {
             user('Task BBB'),
           );
         }).children(
-          path('finish BBB', async (h) => {
+          node('finish BBB', async (h) => {
             h.appendAssistantMessage('inner done');
             await h.runFinishTask();
             assert.strictEqual(h.getStatus(), 'current task: task-aaa');
@@ -549,7 +549,7 @@ describe('manual workflow', () => {
               notification('Task finished. Last response attached.'),
             );
           }).children(
-            path('finish AAA', async (h) => {
+            node('finish AAA', async (h) => {
               h.appendAssistantMessage('Done.');
               await h.runFinishTask();
               assert.strictEqual(h.getStatus(), undefined);
@@ -563,7 +563,7 @@ describe('manual workflow', () => {
               );
             }),
           ),
-          path('abort BBB', async (h) => {
+          node('abort BBB', async (h) => {
             h.appendAssistantMessage('partial inner');
             await h.runAbortTask();
             assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
@@ -578,7 +578,7 @@ describe('manual workflow', () => {
               notification('Task aborted. Branch abandoned without summary.'),
             );
           }).children(
-            path('finish AAA', async (h) => {
+            node('finish AAA', async (h) => {
               h.appendAssistantMessage('Done.');
               await h.runFinishTask();
               assert.strictEqual(h.getStatus(), undefined);
@@ -594,7 +594,7 @@ describe('manual workflow', () => {
           ),
         ),
       ),
-      path('push BBB [inherit]', async (h) => {
+      node('push BBB [inherit]', async (h) => {
         h.appendAssistantMessage('some more work');
         await h.runPushTask('Task BBB', true);
         assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
@@ -609,7 +609,7 @@ describe('manual workflow', () => {
           notification('Task stored. Use `/start-task` or `/auto` to start it.'),
         );
       }).children(
-        path('discard BBB [inherit]', async (h) => {
+        node('discard BBB [inherit]', async (h) => {
           await h.runDiscardTask();
           assert.strictEqual(h.getStatus(), 'current task: task-aaa');
           assert.ok(!h.isLlmTriggered());
@@ -623,7 +623,7 @@ describe('manual workflow', () => {
             notification('Task discarded.'),
           );
         }).children(
-          path('finish AAA', async (h) => {
+          node('finish AAA', async (h) => {
             h.appendAssistantMessage('Done.');
             await h.runFinishTask();
             assert.strictEqual(h.getStatus(), undefined);
@@ -637,7 +637,7 @@ describe('manual workflow', () => {
             );
           }),
         ),
-        path('start BBB [inherit]', async (h) => {
+        node('start BBB [inherit]', async (h) => {
           await h.runStartTask();
           assert.strictEqual(h.getStatus(), 'current task: task-bbb');
           assert.ok(h.isLlmTriggered());
@@ -651,7 +651,7 @@ describe('manual workflow', () => {
             user('Task BBB'),
           );
         }).children(
-          path('finish BBB [inherit]', async (h) => {
+          node('finish BBB [inherit]', async (h) => {
             h.appendAssistantMessage('inner done');
             await h.runFinishTask();
             assert.strictEqual(h.getStatus(), 'current task: task-aaa');
@@ -667,7 +667,7 @@ describe('manual workflow', () => {
               notification('Task finished. Last response attached.'),
             );
           }).children(
-            path('finish AAA', async (h) => {
+            node('finish AAA', async (h) => {
               h.appendAssistantMessage('Done.');
               await h.runFinishTask();
               assert.strictEqual(h.getStatus(), undefined);
@@ -681,7 +681,7 @@ describe('manual workflow', () => {
               );
             }),
           ),
-          path('abort BBB [inherit]', async (h) => {
+          node('abort BBB [inherit]', async (h) => {
             h.appendAssistantMessage('partial inner');
             await h.runAbortTask();
             assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
@@ -696,7 +696,7 @@ describe('manual workflow', () => {
               notification('Task aborted. Branch abandoned without summary.'),
             );
           }).children(
-            path('finish AAA', async (h) => {
+            node('finish AAA', async (h) => {
               h.appendAssistantMessage('Done.');
               await h.runFinishTask();
               assert.strictEqual(h.getStatus(), undefined);
@@ -715,7 +715,7 @@ describe('manual workflow', () => {
     ),
   ).run();
 
-  path('start [no task]', async (h) => {
+  node('start [no task]', async (h) => {
     h.appendUserMessage('main work');
     h.appendAssistantMessage('working...');
     await h.runStartTask();
@@ -728,7 +728,7 @@ describe('manual workflow', () => {
     );
   }).run();
 
-  path('discard [no task]', async (h) => {
+  node('discard [no task]', async (h) => {
     h.appendUserMessage('main work');
     h.appendAssistantMessage('working...');
     await h.runDiscardTask();
@@ -741,7 +741,7 @@ describe('manual workflow', () => {
     );
   }).run();
 
-  path('finish [no task]', async (h) => {
+  node('finish [no task]', async (h) => {
     h.appendUserMessage('main work');
     h.appendAssistantMessage('working...');
     await h.runFinishTask();
@@ -754,7 +754,7 @@ describe('manual workflow', () => {
     );
   }).run();
 
-  path('abort [no task]', async (h) => {
+  node('abort [no task]', async (h) => {
     h.appendUserMessage('main work');
     h.appendAssistantMessage('working...');
     await h.runAbortTask();

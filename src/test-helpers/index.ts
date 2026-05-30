@@ -12,7 +12,7 @@ export {
 
 export { TestHarness } from './test-harness.js';
 
-export { path } from './path-suite.js';
+export { node } from './test-tree.js';
 
 export type {
   BranchEntry,
@@ -22,4 +22,4 @@ export type {
   NotificationEntry,
 } from './common.js';
 
-export type { PathNode, PathFn } from './path-suite.js';
+export type { TestNode, NodeFn } from './test-tree.js';
