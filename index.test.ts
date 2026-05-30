@@ -859,18 +859,34 @@ describe('automated workflow', () => {
   });
 
   it('warns and returns when /auto is already running', async () => {
-    const { assertBranchHistory, releaseNextIdle, flushMicrotasks, emitSessionShutdown, legacyRunAuto } =
-      makeHarness();
+    const h = makeHarness();
 
-    const firstRun = legacyRunAuto();
-    await flushMicrotasks();
+    h.appendUserMessage('start');
+    await h.runPushTask('first task');
 
-    await legacyRunAuto();
-    assertBranchHistory(notification('Auto is already running.'));
+    await h.runAuto({
+      reactions: [
+        [user('first task'), assistant('done')],
+        [assistant('done'), userRunsAuto()],
+      ],
+    });
 
-    await emitSessionShutdown();
-    await releaseNextIdle();
-    await firstRun;
+    // Auto completes: task started on fresh branch, reaction chain fires
+    // (assistant injected, then userRunsAuto triggers second handler
+    // invocation which detects "already running" and returns), then task
+    // finishes normally. Task-branch entries (including the "already
+    // running" notification) are not visible after finishTask navigates
+    // back — same pattern as tests #1/#2.
+    h.assertBranchHistory(
+      user('start'),
+      task('first task'),
+      notification('Task stored. Use `/start-task` or `/auto` to start it.'),
+      taskResult('first-task', 'done'),
+      notification('Task finished. Last response attached.'),
+    );
+    assert.ok(h.isLlmTriggered());
+    // Status line should be clean — no stale [auto] prefix remains.
+    assert.strictEqual(h.getStatus(), undefined);
   });
 
   it('stops when the last assistant message was aborted', async () => {
