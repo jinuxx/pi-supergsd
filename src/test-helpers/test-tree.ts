@@ -14,11 +14,11 @@ export class TestNode {
     private readonly fn?: NodeFn,
   ) {}
 
-  private readonly childPaths: TestNode[] = [];
+  private readonly childNodes: TestNode[] = [];
   private registered = false;
 
   children(...children: TestNode[]): TestNode {
-    this.childPaths.push(...children);
+    this.childNodes.push(...children);
     return this;
   }
 
@@ -28,7 +28,7 @@ export class TestNode {
 
   private register(ancestors: TestNode[]): void {
     if (this.registered) {
-      throw new Error(`Path "${this.name}" has already been registered`);
+      throw new Error(`Node "${this.name}" has already been registered`);
     }
 
     this.registered = true;
@@ -44,7 +44,7 @@ export class TestNode {
       }
     });
 
-    for (const child of this.childPaths) {
+    for (const child of this.childNodes) {
       child.register(chain);
     }
   }
