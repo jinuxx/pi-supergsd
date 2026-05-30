@@ -805,45 +805,31 @@ describe('automated workflow', () => {
   });
 
   it('returns the branch result to the original leaf for branch-context tasks', async () => {
-    const { appendUserMessage, appendAssistantMessage, assertBranchHistory, isLlmTriggered, getStatus, releaseNextIdle, flushMicrotasks, runPushTask, legacyRunAuto } =
-      makeHarness();
+    const h = makeHarness();
 
-    appendUserMessage('main work');
-    appendAssistantMessage('working...');
-    await runPushTask('Quick fix.', true);
-    assert.strictEqual(getStatus(), 'pending task: quick-fix');
-    assertBranchHistory(
+    h.appendUserMessage('main work');
+    h.appendAssistantMessage('working...');
+    await h.runPushTask('Quick fix.', true);
+    assert.strictEqual(h.getStatus(), 'pending task: quick-fix');
+    h.assertBranchHistory(
       user('main work'),
       assistant('working...'),
       task('Quick fix.', true),
       notification('Task stored. Use `/start-task` or `/auto` to start it.'),
     );
 
-    const running = legacyRunAuto();
+    await h.runAuto({
+      reactions: [[user('Quick fix'), assistant('Fixed the bug.')]],
+    });
 
-    await flushMicrotasks();
-    await releaseNextIdle();
-    // Auto started the task (branch context, inherit_context=true)
-    assertBranchHistory(
-      user('main work'),
-      assistant('working...'),
-      task('Quick fix.', true),
-      user('Quick fix.'),
-    );
-
-    appendAssistantMessage('Fixed the bug.');
-
-    await releaseNextIdle();
-    await releaseNextIdle();
-    await running;
-    assertBranchHistory(
+    h.assertBranchHistory(
       user('main work'),
       assistant('working...'),
       task('Quick fix.', true),
       taskResult('quick-fix', 'Fixed the bug.'),
       notification('Task finished. Last response attached.'),
     );
-    assert.ok(isLlmTriggered());
+    assert.ok(h.isLlmTriggered());
   });
 
   it('stops when navigation is cancelled and does not mark the task done', async () => {
