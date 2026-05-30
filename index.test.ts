@@ -874,22 +874,18 @@ describe('automated workflow', () => {
   });
 
   it('stops when the last assistant message was aborted', async () => {
-    const { appendUserMessage, appendAssistantMessage, isLlmTriggered, releaseNextIdle, flushMicrotasks, runPushTask, runStartTask, legacyRunAuto } =
-      makeHarness();
+    const h = makeHarness();
 
-    appendUserMessage('start');
-    await runPushTask('Implement phase 1.', true);
+    h.appendUserMessage('start');
+    await h.runPushTask('Implement phase 1.', true);
 
-    await runStartTask();
+    await h.runAuto({
+      reactions: [
+        [task('Implement phase 1.'), assistant('Stopped by user.', 'aborted')],
+      ],
+    });
 
-    appendAssistantMessage('Stopped by user.', 'aborted');
-
-    const running = legacyRunAuto();
-
-    await flushMicrotasks();
-    await releaseNextIdle();
-    await running;
-    assert.ok(!isLlmTriggered());
+    assert.ok(!h.isLlmTriggered());
   });
 
   it('keeps waiting while follow-up work is pending after finishTask', async () => {
@@ -949,9 +945,13 @@ describe('registration', () => {
   });
 });
 
-const assistant = (content: string) => ({
+const assistant = (content: string, stopReason?: string) => ({
   type: 'message' as const,
-  message: { role: 'assistant' as const, content: [{ type: 'text' as const, text: content }] }
+  message: {
+    role: 'assistant' as const,
+    content: [{ type: 'text' as const, text: content }],
+    ...(stopReason ? { stopReason } : {}),
+  }
 }) as unknown as Partial<BranchEntry>;
 
 const user = (content: string) => ({
@@ -1328,12 +1328,14 @@ function makeHarness() {
 
       if (msg.role === 'assistant') {
         const text = extractContentText(msg.content) ?? '';
+        const stopReason = msg.stopReason as string | undefined;
         session.appendMessage({
           role: 'assistant',
           content: [{ type: 'text', text }],
           timestamp: 0,
           model: 'test',
           provider: 'test',
+          ...(stopReason ? { stopReason } : {}),
         } as Parameters<typeof session.appendMessage>[0]);
         return;
       }
