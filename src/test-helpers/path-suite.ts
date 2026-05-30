@@ -1,6 +1,5 @@
 import { describe, it } from 'node:test';
 
-import { type HarnessImplementation } from './common.js';
 import { makeHarness, type Harness } from './make-harness.js';
 
 export { pathSuite };
@@ -8,7 +7,6 @@ export type { PathNode, PathFn };
 
 function pathSuite(
   description: string,
-  implementation: HarnessImplementation,
   fn: (path: PathFn) => PathNode | PathNode[],
 ): void {
   describe(description, () => {
@@ -20,7 +18,7 @@ function pathSuite(
       const name = chain.map(n => n.name).join(' → ');
 
       it(name, async () => {
-        const h = makeHarness(implementation);
+        const h = makeHarness();
         for (const ancestor of chain) {
           if (ancestor.fn) {
             await ancestor.fn(h);

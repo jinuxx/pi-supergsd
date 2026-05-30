@@ -19,7 +19,6 @@ export type {
   ReactionDescriptor,
   AutoConfig,
   NotificationEntry,
-  HarnessImplementation,
 } from './common.js';
 
 export type { Harness } from './make-harness.js';

@@ -10,7 +10,6 @@ export {
 };
 
 import type {
-  ExtensionAPI,
   SessionEntry,
 } from '@earendil-works/pi-coding-agent';
 
@@ -77,11 +76,4 @@ export type ReactionDescriptor =
   | { type: 'user-runs-auto' }
   ;
 
-export interface HarnessImplementation {
-  createPushTaskTool: (pi: ExtensionAPI) => unknown;
-  createStartTaskCommand: (pi: ExtensionAPI) => unknown;
-  createFinishTaskCommand: (pi: ExtensionAPI) => unknown;
-  createDiscardTaskCommand: (pi: ExtensionAPI) => unknown;
-  createAbortTaskCommand: () => unknown;
-  createAutoCommand: (pi: ExtensionAPI) => unknown;
-}
+

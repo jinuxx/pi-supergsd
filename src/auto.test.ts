@@ -11,11 +11,6 @@ import {
 
 import {
   cmdAuto,
-  toolPushTask,
-  cmdStartTask,
-  cmdFinishTask,
-  cmdAbortTask,
-  cmdDiscardTask,
 } from './index.js';
 
 import {
@@ -32,7 +27,7 @@ import {
 
 describe('automated workflow', () => {
   it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
-    const h = makeHarness(implementation);
+    const h = makeHarness();
 
     h.appendUserMessage('main work');
     h.appendAssistantMessage('working on main...');
@@ -62,7 +57,7 @@ describe('automated workflow', () => {
   });
 
   it('returns the branch result to the original leaf for branch-context tasks', async () => {
-    const h = makeHarness(implementation);
+    const h = makeHarness();
 
     h.appendUserMessage('main work');
     h.appendAssistantMessage('working...');
@@ -89,7 +84,7 @@ describe('automated workflow', () => {
   });
 
   it('stops when navigation is cancelled and does not mark the task done', async () => {
-    const h = makeHarness(implementation);
+    const h = makeHarness();
 
     h.appendUserMessage('main work');
     await h.runPushTask('Analyze performance.');
@@ -106,7 +101,7 @@ describe('automated workflow', () => {
   });
 
   it('notifies and exits when started with no pending tasks', async () => {
-    const h = makeHarness(implementation);
+    const h = makeHarness();
     await h.runAuto({ reactions: [] });
     h.assertBranchHistory(
       notification('No pending tasks to run.'),
@@ -180,7 +175,7 @@ describe('automated workflow', () => {
   });
 
   it('warns and returns when /auto is already running', async () => {
-    const h = makeHarness(implementation);
+    const h = makeHarness();
 
     h.appendUserMessage('start');
     await h.runPushTask('first task');
@@ -204,7 +199,7 @@ describe('automated workflow', () => {
   });
 
   it('stops when the last assistant message was aborted', async () => {
-    const h = makeHarness(implementation);
+    const h = makeHarness();
 
     h.appendUserMessage('start');
     await h.runPushTask('Implement phase 1.', true);
@@ -226,7 +221,7 @@ describe('automated workflow', () => {
   });
 
   it('processes a subtask pushed during a task', async () => {
-    const h = makeHarness(implementation);
+    const h = makeHarness();
 
     h.appendUserMessage('main work');
     h.appendAssistantMessage('working...');
@@ -259,7 +254,7 @@ describe('automated workflow', () => {
   });
 
   it('continues processing when user queues a steering message during auto', async () => {
-    const h = makeHarness(implementation);
+    const h = makeHarness();
 
     h.appendUserMessage('start');
     await h.runPushTask('Quick fix.', true);
@@ -285,7 +280,7 @@ describe('automated workflow', () => {
   });
 
   it('stops when session is shut down during auto', async () => {
-    const h = makeHarness(implementation);
+    const h = makeHarness();
 
     h.appendUserMessage('start');
     await h.runPushTask('Shutdown task', true);
@@ -310,12 +305,3 @@ describe('automated workflow', () => {
     assert.strictEqual(h.getStatus(), 'current task: shutdown-task');
   });
 });
-
-const implementation = {
-  createPushTaskTool: toolPushTask,
-  createStartTaskCommand: cmdStartTask,
-  createFinishTaskCommand: cmdFinishTask,
-  createAbortTaskCommand: cmdAbortTask,
-  createDiscardTaskCommand: cmdDiscardTask,
-  createAutoCommand: cmdAuto,
-};

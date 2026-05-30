@@ -15,7 +15,9 @@ export default tseslint.config(
   {
     settings: {
       unslop: {
-        architecture: {},
+        architecture: {
+          'src/test-helpers': { imports: ['src'] },
+        },
       },
     },
 

@@ -1,15 +1,6 @@
 import assert from 'node:assert';
 
 import {
-  toolPushTask,
-  cmdStartTask,
-  cmdFinishTask,
-  cmdAbortTask,
-  cmdDiscardTask,
-  cmdAuto,
-} from './index.js';
-
-import {
   assistant,
   notification,
   pathSuite,
@@ -18,16 +9,7 @@ import {
   user,
 } from './test-helpers/index.js';
 
-const implementation = {
-  createPushTaskTool: toolPushTask,
-  createStartTaskCommand: cmdStartTask,
-  createFinishTaskCommand: cmdFinishTask,
-  createAbortTaskCommand: cmdAbortTask,
-  createDiscardTaskCommand: cmdDiscardTask,
-  createAutoCommand: cmdAuto,
-};
-
-pathSuite('manual workflow', implementation, (path) => {
+pathSuite('manual workflow', (path) => {
     return [
         path('push AAA', async (h) => {
             h.appendUserMessage('main work');

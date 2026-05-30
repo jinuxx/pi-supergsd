@@ -8,10 +8,18 @@ import {
 } from '@earendil-works/pi-coding-agent';
 
 import {
+  toolPushTask,
+  cmdAuto,
+  cmdStartTask,
+  cmdFinishTask,
+  cmdDiscardTask,
+  cmdAbortTask,
+} from '../index.js';
+
+import {
   notification,
   type AutoConfig,
   type BranchEntry,
-  type HarnessImplementation,
   type MatchDescriptor,
   type ReactionDescriptor,
 } from './common.js';
@@ -21,7 +29,7 @@ export type { Harness };
 
 type Harness = ReturnType<typeof makeHarness>;
 
-function makeHarness(implementation: HarnessImplementation) {
+function makeHarness() {
   const sm = SessionManager.inMemory();
   // Seed a non-visible root entry so findFreshTargetId can escape past user messages.
   // Pi always inserts thinking_level_change at session creation (main.js:471).
@@ -262,7 +270,7 @@ function makeHarness(implementation: HarnessImplementation) {
   // ── Convenience wrappers (pre-bound to pi / ctx) ───────────────
 
   async function runPushTask(prompt: string, inherit_context?: boolean) {
-    const tool = implementation.createPushTaskTool(pi) as {
+    const tool = toolPushTask(pi) as {
       execute: (
         toolCallId: string,
         params: { prompt: string; inherit_context?: boolean },
@@ -285,14 +293,14 @@ function makeHarness(implementation: HarnessImplementation) {
     await handlerP;
   }
 
-  const runStartTask = () => runTaskCommand(implementation.createStartTaskCommand(pi) as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> });
-  const runFinishTask = () => runTaskCommand(implementation.createFinishTaskCommand(pi) as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> });
-  const runDiscardTask = () => runTaskCommand(implementation.createDiscardTaskCommand(pi) as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> });
-  const runAbortTask = () => runTaskCommand(implementation.createAbortTaskCommand() as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> });
+  const runStartTask = () => runTaskCommand(cmdStartTask(pi) as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> });
+  const runFinishTask = () => runTaskCommand(cmdFinishTask(pi) as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> });
+  const runDiscardTask = () => runTaskCommand(cmdDiscardTask(pi) as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> });
+  const runAbortTask = () => runTaskCommand(cmdAbortTask() as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> });
 
   // Shared auto handler — created once so closure state (running/stopped)
   // is shared across runAuto and userRunsAuto reaction.
-  const autoHandler = (implementation.createAutoCommand(pi) as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> }).handler;
+  const autoHandler = (cmdAuto(pi) as { handler: (args: string, ctx: ExtensionCommandContext) => Promise<unknown> }).handler;
 
   /**
    * Scan branch entries not yet in the seenIds set and apply the first
