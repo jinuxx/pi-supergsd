@@ -1027,12 +1027,16 @@ const userEsc = () => ({ type: 'user-esc' as const });
 
 const userCtrlC = () => ({ type: 'user-ctrl-c' as const });
 
+const userRunsAuto = () => ({ type: 'user-runs-auto' as const });
+
 // ── Test harness ─────────────────────────────────────────────────
 
 function makeHarness() {
-  // userEsc is referenced through reaction types in runAuto; reference it here
-  // to suppress TS6133 until it's used in tests (Tasks 4-5).
+  // userEsc, userCtrlC, userRunsAuto are referenced through reaction types in
+  // runAuto; reference them here to suppress TS6133.
   void userEsc;
+  void userCtrlC;
+  void userRunsAuto;
 
   const sm = SessionManager.inMemory();
   // Seed a non-visible root entry so findFreshTargetId can escape past user messages.
@@ -1513,6 +1517,7 @@ type ReactionDescriptor =
   | Partial<BranchEntry>                        // assistant(), user(), task() helpers produce these
   | { type: 'user-esc' }                       // userEsc()
   | { type: 'user-ctrl-c' }                    // userCtrlC()
+  | { type: 'user-runs-auto' }                 // userRunsAuto()
   ;
 
 interface AutoConfig {
