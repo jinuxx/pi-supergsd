@@ -47,11 +47,10 @@ export default function registerTaskCommands(pi: ExtensionAPI): void {
 
 export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
   let running = false;
-  let stopped = false;
+  let stopCurrentRun: (() => void) | null = null;
 
-  // Register shutdown handler inside the closure so it can set `stopped`.
   pi.on('session_shutdown', async () => {
-    stopped = true;
+    stopCurrentRun?.();
   });
 
   return {
@@ -63,7 +62,11 @@ export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
       }
 
       running = true;
+      let stopped = false;
       let sawTaskActivity = false;
+      stopCurrentRun = () => {
+        stopped = true;
+      };
 
       // Wrap setStatus so task status lines show [auto] prefix while running.
       // startTask, finishTask, and discardTask all call updateTaskStatus which
@@ -77,6 +80,7 @@ export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
           originalSetStatus(key, value);
         }
       };
+      updateTaskStatus(ctx.sessionManager, ctx.ui.setStatus.bind(ctx.ui), ctx.ui.theme);
 
       try {
         while (!stopped) {
@@ -118,9 +122,9 @@ export function createAutoCommand(pi: ExtensionAPI): CommandOptions {
         }
       } finally {
         ctx.ui.setStatus = originalSetStatus;
+        stopCurrentRun = null;
         updateTaskStatus(ctx.sessionManager, originalSetStatus, ctx.ui.theme);
         running = false;
-        stopped = false;
       }
     },
   };

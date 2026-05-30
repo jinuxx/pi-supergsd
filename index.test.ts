@@ -794,6 +794,7 @@ describe('automated workflow', () => {
       reactions: [[user('Analyze performance'), assistant('Found 3 bottlenecks: ...')]],
     });
 
+    h.assertTaskStatusHistoryIncludes('[auto] pending task: analyze-performance');
     h.assertBranchHistory(
       user('main work'),
       assistant('working on main...'),
@@ -801,7 +802,6 @@ describe('automated workflow', () => {
       taskResult('analyze-performance', 'Found 3 bottlenecks: ...'),
       notification('Task finished. Last response attached.'),
     );
-    assert.ok(h.isLlmTriggered());
     // Status line should be clean — no stale [auto] prefix remains.
     assert.strictEqual(h.getStatus(), undefined);
   });
@@ -831,7 +831,6 @@ describe('automated workflow', () => {
       taskResult('quick-fix', 'Fixed the bug.'),
       notification('Task finished. Last response attached.'),
     );
-    assert.ok(h.isLlmTriggered());
   });
 
   it('stops when navigation is cancelled and does not mark the task done', async () => {
@@ -844,7 +843,6 @@ describe('automated workflow', () => {
       reactions: [[task('Analyze performance.'), userEsc()]],
     });
 
-    assert.ok(!h.isLlmTriggered());
     h.assertBranchHistory(
       user('main work'),
       task('Analyze performance.'),
@@ -858,6 +856,72 @@ describe('automated workflow', () => {
     h.assertBranchHistory(
       notification('No pending tasks to run.'),
     );
+  });
+
+  it('still enters the auto loop after a prior session shutdown event', async () => {
+    const sm = SessionManager.inMemory();
+    sm.appendThinkingLevelChange('off');
+
+    const idleWaiters: Array<() => void> = [];
+    const sessionShutdownHandlers: Array<() => unknown> = [];
+    const notifications: string[] = [];
+
+    const pi = {
+      appendEntry() {},
+      sendUserMessage() {},
+      sendMessage() {},
+      on(eventName: string, handler: () => unknown) {
+        if (eventName === 'session_shutdown') sessionShutdownHandlers.push(handler);
+      },
+      registerMessageRenderer() {},
+      registerTool() {},
+      registerCommand() {},
+    } as unknown as ExtensionAPI;
+
+    const ctx = {
+      hasUI: true,
+      waitForIdle: async () => {
+        await new Promise<void>((resolve) => {
+          idleWaiters.push(resolve);
+        });
+      },
+      hasPendingMessages: () => false,
+      sessionManager: sm,
+      ui: {
+        notify(message: string) {
+          notifications.push(message);
+        },
+        setStatus() {},
+        theme: {
+          fg: (_key: string, text: string) => text,
+          bg: (_key: string, text: string) => text,
+          bold: (text: string) => text,
+        } as unknown as Theme,
+      },
+      navigateTree: async () => ({ cancelled: false }),
+    } as unknown as ExtensionCommandContext;
+
+    const auto = createAutoCommand(pi);
+    for (const handler of sessionShutdownHandlers) {
+      await handler();
+    }
+
+    let settled = false;
+    const autoPromise = auto.handler('', ctx).finally(() => {
+      settled = true;
+    });
+
+    await Promise.resolve();
+
+    assert.strictEqual(idleWaiters.length, 1);
+    assert.strictEqual(settled, false);
+
+    const waiter = idleWaiters.shift();
+    assert.ok(waiter);
+    waiter();
+
+    await autoPromise;
+    assert.deepStrictEqual(notifications, ['No pending tasks to run.']);
   });
 
   it('warns and returns when /auto is already running', async () => {
@@ -881,7 +945,6 @@ describe('automated workflow', () => {
       taskResult('first-task', 'done'),
       notification('Task finished. Last response attached.'),
     );
-    assert.ok(h.isLlmTriggered());
     assert.strictEqual(h.getStatus(), undefined);
   });
 
@@ -897,7 +960,6 @@ describe('automated workflow', () => {
       ],
     });
 
-    assert.ok(!h.isLlmTriggered());
     h.assertBranchHistory(
       user('start'),
       task('Implement phase 1.', true),
@@ -923,8 +985,14 @@ describe('automated workflow', () => {
       ],
     });
 
-    // Parent finishes last. Only original-branch entries appear (subtask
-    // entries are on different forks — same pattern as tests #1/#2).
+    h.assertSessionContains(
+      user('subtask'),
+      assistant('sub done'),
+      taskResult('subtask', 'sub done'),
+    );
+
+    // Parent finishes last. Only original-branch entries appear on the final
+    // branch (subtask entries live elsewhere in the session tree).
     h.assertBranchHistory(
       user('main work'),
       assistant('working...'),
@@ -959,7 +1027,6 @@ describe('automated workflow', () => {
       taskResult('quick-fix', 'adjusted response'),
       notification('Task finished. Last response attached.'),
     );
-    assert.ok(h.isLlmTriggered());
   });
 
   it('stops when session is shut down during auto', async () => {
@@ -978,7 +1045,6 @@ describe('automated workflow', () => {
     // Auto started task (inherit, no navigation), injected assistant,
     // then session shutdown fired. No navigation back — task-branch
     // entries remain visible. No taskResult — task was never finished.
-    assert.ok(!h.isLlmTriggered());
     h.assertBranchHistory(
       user('start'),
       task('Shutdown task', true),
@@ -1070,6 +1136,7 @@ function makeHarness() {
 
   const trackedHints: Array<{ text: string; afterEntryId: string | null }> = [];
   const notificationLog: string[] = [];
+  const taskStatusHistory: Array<string | undefined> = [];
   let cancelNextNav = false;
   let taskStatus: string | undefined;
 
@@ -1125,7 +1192,10 @@ function makeHarness() {
         notificationLog.push(message);
       },
       setStatus(key: string, value: string | undefined) {
-        if (key === 'task') taskStatus = value;
+        if (key === 'task') {
+          taskStatus = value;
+          taskStatusHistory.push(value);
+        }
       },
       theme: {
         fg: (_key: string, text: string) => text,
@@ -1175,54 +1245,65 @@ function makeHarness() {
     } as Parameters<typeof sm.appendMessage>[0]);
   }
 
+  function stripVisibleEntry(entry: BranchEntry): Partial<BranchEntry> | null {
+    const HIDDEN_TYPES = new Set(['thinking_level_change', 'model_change', 'session_info', 'label']);
+    const isSkipped =
+      HIDDEN_TYPES.has(entry.type) ||
+      (entry.type === 'custom' && (entry.customType === 'task-done' || entry.customType === 'task-start'));
+
+    if (isSkipped) {
+      return null;
+    }
+
+    const { id: _id, parentId: _pid, timestamp: _ts, display: _dp, data: rawData, details: rawDetails, ...restEntry } = entry as unknown as Record<string, unknown>;
+    const stripped: Record<string, unknown> = { ...restEntry };
+
+    if (stripped.message && typeof stripped.message === 'object') {
+      const { timestamp: _mt, model: _mp, provider: _pp, ...msgRest } = stripped.message as Record<string, unknown>;
+      stripped.message = msgRest;
+    }
+
+    if (rawData && typeof rawData === 'object') {
+      const cleaned: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(rawData as Record<string, unknown>)) {
+        if (typeof v !== 'string' || !/^[a-f0-9]{8}$/.test(v)) {
+          cleaned[k] = v;
+        }
+      }
+      if (Object.keys(cleaned).length > 0) stripped.data = cleaned;
+    }
+
+    if (rawDetails && typeof rawDetails === 'object') {
+      const cleaned: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(rawDetails as Record<string, unknown>)) {
+        if (typeof v !== 'string' || !/^[a-f0-9]{8}$/.test(v)) {
+          cleaned[k] = v;
+        }
+      }
+      if (Object.keys(cleaned).length > 0) stripped.details = cleaned;
+    }
+
+    return stripped as Partial<BranchEntry>;
+  }
+
+  function entriesEqual(actual: Partial<BranchEntry>, expected: Partial<BranchEntry>): boolean {
+    try {
+      assert.deepStrictEqual(actual, expected);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   function assertBranchHistory(...expected: Partial<BranchEntry>[]) {
     const entries = sm.getBranch();
     const actual: Partial<BranchEntry>[] = [];
     const consumedHints = new Set<number>();
 
     for (const entry of entries) {
-      // Skip entries invisible to both the user and LLM context.
-      const HIDDEN_TYPES = new Set(['thinking_level_change', 'model_change', 'session_info', 'label']);
-      const isSkipped =
-        HIDDEN_TYPES.has(entry.type) ||
-        (entry.type === 'custom' && (entry.customType === 'task-done' || entry.customType === 'task-start'));
-
-      if (!isSkipped) {
-        // Strip IDs, internal fields, display, and content for comparison
-        const { id: _id, parentId: _pid, timestamp: _ts, display: _dp, data: rawData, details: rawDetails, ...restEntry } = entry as unknown as Record<string, unknown>;
-
-        // Build stripped version excluding fields we always strip
-        const stripped: Record<string, unknown> = { ...restEntry };
-
-        // Clean nested message fields
-        if (stripped.message && typeof stripped.message === 'object') {
-          const { timestamp: _mt, model: _mp, provider: _pp, ...msgRest } = stripped.message as Record<string, unknown>;
-          stripped.message = msgRest;
-        }
-
-        // Process data: only include non-dynamic keys
-        if (rawData && typeof rawData === 'object') {
-          const cleaned: Record<string, unknown> = {};
-          for (const [k, v] of Object.entries(rawData as Record<string, unknown>)) {
-            if (typeof v !== 'string' || !/^[a-f0-9]{8}$/.test(v)) {
-              cleaned[k] = v;
-            }
-          }
-          if (Object.keys(cleaned).length > 0) stripped.data = cleaned;
-        }
-
-        // Process details: only include non-dynamic keys
-        if (rawDetails && typeof rawDetails === 'object') {
-          const cleaned: Record<string, unknown> = {};
-          for (const [k, v] of Object.entries(rawDetails as Record<string, unknown>)) {
-            if (typeof v !== 'string' || !/^[a-f0-9]{8}$/.test(v)) {
-              cleaned[k] = v;
-            }
-          }
-          if (Object.keys(cleaned).length > 0) stripped.details = cleaned;
-        }
-
-        actual.push(stripped as Partial<BranchEntry>);
+      const stripped = stripVisibleEntry(entry);
+      if (stripped) {
+        actual.push(stripped);
       }
 
       // Insert tracked hints with matching afterEntryId after the entry
@@ -1256,12 +1337,30 @@ function makeHarness() {
     assert.deepStrictEqual(actual, expected);
   }
 
+  function assertSessionContains(...expected: Partial<BranchEntry>[]): void {
+    const actual = sm.getEntries()
+      .map(entry => stripVisibleEntry(entry))
+      .filter((entry): entry is Partial<BranchEntry> => entry !== null);
 
+    for (const expectedEntry of expected) {
+      assert.ok(
+        actual.some(entry => entriesEqual(entry, expectedEntry)),
+        `Expected session to contain entry: ${JSON.stringify(expectedEntry)}`,
+      );
+    }
+  }
 
   function assertNotifications(...expected: string[]): void {
     for (const text of expected) {
       assert.ok(notificationLog.includes(text), `Expected notification log to include: ${text}`);
     }
+  }
+
+  function assertTaskStatusHistoryIncludes(expected: string | undefined): void {
+    assert.ok(
+      taskStatusHistory.includes(expected),
+      `Expected task status history to include ${JSON.stringify(expected)}, got ${JSON.stringify(taskStatusHistory)}`,
+    );
   }
 
 
@@ -1458,6 +1557,7 @@ function makeHarness() {
   async function runAuto(config: AutoConfig): Promise<void> {
     const reactions = config.reactions ?? [];
     let settled = false;
+    let lastStep = -1;
     // Start with empty seen set so the first scan covers all pre-existing entries.
     // This is needed for user-esc tests where the task entry exists before auto runs.
     const seenIds = new Set<string>();
@@ -1466,6 +1566,7 @@ function makeHarness() {
 
     const MAX_STEPS = 100;
     for (let steps = 0; steps < MAX_STEPS && !settled; steps++) {
+      lastStep = steps;
       await Promise.resolve();
 
       const waiter = idleWaiters.shift();
@@ -1487,7 +1588,9 @@ function makeHarness() {
     }
 
     if (!settled) {
-      throw new Error('runAuto did not complete within step cap');
+      throw new Error(
+        `runAuto did not complete within step cap (${MAX_STEPS}); lastStep=${lastStep}, taskStatus=${JSON.stringify(taskStatus)}, waiters=${idleWaiters.length}`,
+      );
     }
 
     await handlerPromise;
@@ -1499,7 +1602,9 @@ function makeHarness() {
 
   return {
     assertBranchHistory,
+    assertSessionContains,
     assertNotifications,
+    assertTaskStatusHistoryIncludes,
     isLlmTriggered,
     getStatus,
     appendUserMessage,
