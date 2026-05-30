@@ -1068,7 +1068,6 @@ function makeHarness() {
 
   const trackedHints: Array<{ text: string; afterEntryId: string | null }> = [];
   let cancelNextNav = false;
-  let pendingMessages = false;
   let taskStatus: string | undefined;
 
 
@@ -1115,7 +1114,7 @@ function makeHarness() {
         idleWaiters.push(resolve);
       });
     },
-    hasPendingMessages: () => pendingMessages,
+    hasPendingMessages: () => false,
     sessionManager: sm,
     ui: {
       notify(message: string) {
