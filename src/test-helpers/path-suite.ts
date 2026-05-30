@@ -3,7 +3,6 @@ import { it } from 'node:test';
 import { TestHarness } from './test-harness.js';
 
 export function pathSuite(...roots: PathNode[]): void {
-
   function registerTests(node: PathNode, ancestors: PathNode[]): void {
     const chain = [...ancestors, node];
     const name = chain.map(n => n.name).join(' → ');
@@ -11,9 +10,7 @@ export function pathSuite(...roots: PathNode[]): void {
     it(name, async () => {
       const h = new TestHarness();
       for (const ancestor of chain) {
-        if (ancestor.fn) {
-          await ancestor.fn(h);
-        }
+        await ancestor.fn?.(h);
       }
     });
 

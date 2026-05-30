@@ -88,16 +88,21 @@ export class TestHarness {
 
   isLlmTriggered(): boolean {
     const branch = this.sm.getBranch();
-    if (branch.length === 0) return false;
 
     // Walk backwards past 'custom' entries (data-only bookkeeping, invisible to LLM)
     for (let i = branch.length - 1; i >= 0; i--) {
       const entry = branch[i];
-      if (entry.type === 'custom') continue;
-      if (entry.type === 'message' && entry.message.role === 'user') return this.pi.isTriggeredUserMessage(entry.id);
-      if (entry.type === 'message' && entry.message.role === 'assistant') return false;
-      if (entry.type === 'custom_message') return this.pi.isTriggeredCustomMessage(entry.id);
-      return false;
+
+      switch (entry.type) {
+        case 'custom':
+          continue;
+        case 'message':
+          return entry.message.role === 'user' && this.pi.isTriggeredUserMessage(entry.id);
+        case 'custom_message':
+          return this.pi.isTriggeredCustomMessage(entry.id);
+        default:
+          return false;
+      }
     }
 
     return false;
@@ -212,8 +217,8 @@ export class TestHarness {
       settled = true;
     });
 
-    const MAX_STEPS = 100;
-    for (let steps = 0; steps < MAX_STEPS && !settled; steps++) {
+    const maxSteps = 100;
+    for (let steps = 0; steps < maxSteps && !settled; steps++) {
       lastStep = steps;
       await Promise.resolve();
 
@@ -231,13 +236,13 @@ export class TestHarness {
         } while (dirty);
 
         waiter();
-        for (let i = 0; i < 10; i++) await Promise.resolve();
+        await flushMicrotasks();
       }
     }
 
     if (!settled) {
       throw new Error(
-        `runAuto did not complete within step cap (${MAX_STEPS}); lastStep=${lastStep}, taskStatus=${JSON.stringify(this.taskStatus)}, waiters=${this.idleWaiters.length}`,
+        `runAuto did not complete within step cap (${maxSteps}); lastStep=${lastStep}, taskStatus=${JSON.stringify(this.taskStatus)}, waiters=${this.idleWaiters.length}`,
       );
     }
 
@@ -249,12 +254,7 @@ export class TestHarness {
   }
 
   private stripVisibleEntry(entry: SessionEntry): BranchEntry | null {
-    const HIDDEN_TYPES = new Set(['thinking_level_change', 'model_change', 'session_info', 'label']);
-    const isSkipped =
-      HIDDEN_TYPES.has(entry.type)
-      || (entry.type === 'custom' && (entry.customType === 'task-done' || entry.customType === 'task-start'));
-
-    if (isSkipped) {
+    if (isHiddenEntry(entry)) {
       return null;
     }
 
@@ -325,9 +325,7 @@ export class TestHarness {
     const next = this.idleWaiters.shift();
     assert.ok(next, 'Expected a pending waitForIdle call.');
     next();
-    for (let i = 0; i < 10; i++) {
-      await Promise.resolve();
-    }
+    await flushMicrotasks();
     await handlerP;
   }
 
@@ -362,61 +360,62 @@ export class TestHarness {
     if (match.type === 'custom') {
       if (entry.type !== 'custom' || entry.customType !== match.customType) return false;
       const entryData = readTaskData(entry.data);
-      if (!entryData) return false;
-
-      if (!entryData.prompt.includes(match.data.prompt)) return false;
-      if (entryData.inherit_context !== match.data.inherit_context) return false;
-      return true;
+      return entryData !== null
+        && entryData.prompt.includes(match.data.prompt)
+        && entryData.inherit_context === match.data.inherit_context;
     }
 
     return false;
   }
 
   private applyReaction(reaction: ReactionDescriptor): void {
-    // --- user-esc reaction: cancel next navigation ---
-    if (reaction.type === 'user-esc') {
-      this.cancelNextNav = true;
-      return;
-    }
+    switch (reaction.type) {
+      case 'user-esc':
+        this.cancelNextNav = true;
+        return;
+      case 'user-ctrl-c':
+        this.pi.triggerSessionShutdown();
+        return;
+      case 'user-runs-auto':
+        // Fire-and-forget: the running guard and notification happen before the first await.
+        this.autoHandler('', this.ctx).catch(() => {});
+        return;
+      case 'message': {
+        const text = extractContentText(reaction.message.content) ?? '';
+        const message = reaction.message.role === 'assistant'
+          ? makeAssistantMessage(text, reaction.message.stopReason)
+          : makeUserMessage(text);
 
-    // --- user-ctrl-c reaction: trigger session shutdown ---
-    if (reaction.type === 'user-ctrl-c') {
-      this.pi.triggerSessionShutdown();
-      return;
-    }
-
-    // --- user-runs-auto reaction: invoke auto handler reentrantly ---
-    if (reaction.type === 'user-runs-auto') {
-      // Invoke the same auto handler from within the active run. The
-      // second invocation detects the closure's `running` flag is true,
-      // injects "Auto is already running", and returns immediately.
-      // Fire-and-forget: the handler is async but the guard check and
-      // notification happen synchronously before any await.
-      this.autoHandler('', this.ctx).catch(() => {});
-      return;
-    }
-
-    // --- message-type reactions (assistant, user) ---
-    if (reaction.type === 'message') {
-      const text = extractContentText(reaction.message.content) ?? '';
-
-      if (reaction.message.role === 'assistant') {
-        this.sm.appendMessage(makeAssistantMessage(text, reaction.message.stopReason));
+        this.sm.appendMessage(message);
         return;
       }
-
-      this.sm.appendMessage(makeUserMessage(text));
-      return;
-    }
-
-    // --- custom-type reactions (task) ---
-    if (reaction.type === 'custom') {
-      this.sm.appendCustomEntry('task', reaction.data);
+      case 'custom':
+        this.sm.appendCustomEntry('task', reaction.data);
     }
   }
 }
 
 type TaskCommand = { handler: (args: string, ctx: ExtensionCommandContext) => Promise<void> };
+
+async function flushMicrotasks(): Promise<void> {
+  for (let i = 0; i < 10; i++) {
+    await Promise.resolve();
+  }
+}
+
+function isHiddenEntry(entry: SessionEntry): boolean {
+  switch (entry.type) {
+    case 'thinking_level_change':
+    case 'model_change':
+    case 'session_info':
+    case 'label':
+      return true;
+    case 'custom':
+      return entry.customType === 'task-done' || entry.customType === 'task-start';
+    default:
+      return false;
+  }
+}
 
 function makeAssistantMessage(
   text: string,

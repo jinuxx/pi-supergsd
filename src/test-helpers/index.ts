@@ -22,5 +22,4 @@ export type {
   NotificationEntry,
 } from './common.js';
 
-
 export type { PathNode, PathFn } from './path-suite.js';

@@ -23,9 +23,7 @@ export class PiStub implements Partial<ExtensionAPI> {
   ): void {
     const text = extractContentText(content) ?? '';
     this.sessionManager.appendMessage(makeUserMessage(text, Date.now()));
-    const branch = this.sessionManager.getBranch();
-    const last = branch[branch.length - 1];
-    if (last) this.triggeredUserMessages.add(last.id);
+    this.recordLastEntry(this.triggeredUserMessages);
   }
 
   sendMessage(
@@ -40,9 +38,7 @@ export class PiStub implements Partial<ExtensionAPI> {
     );
 
     if (options?.triggerTurn) {
-      const branch = this.sessionManager.getBranch();
-      const last = branch[branch.length - 1];
-      if (last) this.triggeredCustomMessages.add(last.id);
+      this.recordLastEntry(this.triggeredCustomMessages);
     }
   }
 
@@ -58,6 +54,12 @@ export class PiStub implements Partial<ExtensionAPI> {
     for (const handler of this.sessionShutdownHandlers) {
       handler();
     }
+  }
+
+  private recordLastEntry(target: Set<string>): void {
+    const branch = this.sessionManager.getBranch();
+    const last = branch[branch.length - 1];
+    if (last) target.add(last.id);
   }
 }
 
