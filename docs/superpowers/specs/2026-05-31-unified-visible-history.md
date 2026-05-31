@@ -72,17 +72,21 @@ class TestSession {
 }
 ```
 
-The exported test descriptor surface should also move here:
+The exported test descriptor surface and compatibility helpers should also move here:
 
 - `assistant(...)`
 - `user(...)`
 - `task(...)`
 - `taskResult(...)`
 - `notification(...)`
+- `assumeCommandContext(...)`
 - `type SessionEntry`
 - `type NotificationEntry`
+- `type DurableSessionEntry`
 
 `src/test-helpers/index.ts` should re-export those helpers from `test-session.ts`.
+
+`assumeCommandContext(...)` moves here as a compatibility utility because existing tests import it today from `descriptors.ts`.
 
 `assertSessionContains(...)` remains on `TestHarness` temporarily as a legacy compatibility helper.
 
@@ -109,6 +113,8 @@ type SessionEntry =
   | TaskEntry
   | TaskResultEntry
   | NotificationEntry;
+
+type DurableSessionEntry = Exclude<SessionEntry, NotificationEntry>;
 ```
 
 `NotificationEntry` is a test-friendly visible descriptor, not a durable session entry:
@@ -160,7 +166,15 @@ This replaces the old visible-session assertion pair:
 
 `assertSessionContains(...)` stays for now as a legacy compatibility API during migration, but is no longer the preferred primary assertion and should be considered for later removal.
 
-`assertNotificationEntries(...)` should be removed after migration unless a remaining low-level test proves it still adds value.
+Its post-refactor signature should be:
+
+```ts
+assertSessionContains(...expected: DurableSessionEntry[]): void
+```
+
+It continues to assert against durable session-derived visible entries only. Notifications are excluded because they are ephemeral UI effects, not persisted session data.
+
+`assertNotificationEntries(...)` should be removed as part of this refactor. If a narrow internal test still needs to verify raw UI-notification metadata during the transition, that should happen in focused `TestSession` tests rather than through a retained public harness assertion.
 
 ## Merge algorithm
 
@@ -205,6 +219,12 @@ For non-notification entries, existing descriptor equality behavior stays the sa
 ## Migration plan
 
 All tests currently using split assertions should be rewritten to use `assertSession(...)`.
+
+At the time of writing, the migration scope includes:
+
+- `src/manual.test.ts`
+- `src/auto.test.ts`
+- `src/test-helpers/harness.test.ts`
 
 Example rewrite:
 
@@ -261,13 +281,16 @@ If a notification has `anchorEntryId === null`, treat it as a leading visible it
 
 - `src/test-helpers/harness.ts`
 - `src/test-helpers/index.ts`
-- tests currently using `assertBranchHistory(...)` and `assertNotifications(...)`
+- `src/manual.test.ts`
+- `src/auto.test.ts`
+- `src/test-helpers/harness.test.ts`
 
 ### Remove or fold away
 
 - `src/test-helpers/ui.ts`
 - `src/test-helpers/descriptors.ts`
 - old assertion methods superseded by `assertSession(...)`
+- `assertNotificationEntries(...)`
 
 ## Testing requirements
 
@@ -280,6 +303,9 @@ Add or update tests to cover:
 - omission of notifications from another branch state
 - migration of `src/test-helpers/harness.test.ts`
 - migration of `src/manual.test.ts`
+- migration of `src/auto.test.ts`
+- compatibility coverage for `assumeCommandContext(...)` after its move into `test-session.ts`
+- legacy-compatibility coverage confirming `assertSessionContains(...)` still ignores notifications and only matches durable session-derived entries
 
 ## Recommendation
 
