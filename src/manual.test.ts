@@ -52,7 +52,7 @@ describe('manual workflow', () => {
           assistant('working...'),
           task('Task AAA'),
           taskResult('task-aaa', 'Done.'),
-          silentAssistant,
+          assistant(''),
         );
         h.assertNotifications('Task finished. Last response attached.');
       }).children(
@@ -64,7 +64,7 @@ describe('manual workflow', () => {
             assistant('working...'),
             task('Task AAA'),
             taskResult('task-aaa', 'Done.'),
-            silentAssistant,
+            assistant(''),
           );
           h.assertNotifications('No pending task. Use push-task first.');
         }),
@@ -76,7 +76,7 @@ describe('manual workflow', () => {
             assistant('working...'),
             task('Task AAA'),
             taskResult('task-aaa', 'Done.'),
-            silentAssistant,
+            assistant(''),
           );
           h.assertNotifications('No pending task to discard.');
         }),
@@ -88,7 +88,7 @@ describe('manual workflow', () => {
             assistant('working...'),
             task('Task AAA'),
             taskResult('task-aaa', 'Done.'),
-            silentAssistant,
+            assistant(''),
           );
           h.assertNotifications('Not inside task, nothing to finish.');
         }),
@@ -100,7 +100,7 @@ describe('manual workflow', () => {
             assistant('working...'),
             task('Task AAA'),
             taskResult('task-aaa', 'Done.'),
-            silentAssistant,
+            assistant(''),
           );
           h.assertNotifications('Not inside task, nothing to abort.');
         }),
@@ -132,7 +132,7 @@ describe('manual workflow', () => {
               assistant('working...'),
               task('Task AAA'),
               taskResult('task-aaa', 'Done.'),
-              silentAssistant,
+              assistant(''),
             );
             h.assertNotifications('Task finished. Last response attached.');
           }),
@@ -166,7 +166,7 @@ describe('manual workflow', () => {
               assistant('working...'),
               task('Task AAA'),
               taskResult('task-aaa', 'Done.'),
-              silentAssistant,
+              assistant(''),
             );
             h.assertNotifications('Task finished. Last response attached.');
           }),
@@ -188,7 +188,7 @@ describe('manual workflow', () => {
               assistant('Done.'),
               task('Task BBB'),
               taskResult('task-bbb', 'inner done'),
-              silentAssistant,
+              assistant(''),
             );
             h.assertNotifications('Task finished. Last response attached.');
           }).children(
@@ -200,7 +200,7 @@ describe('manual workflow', () => {
                 assistant('working...'),
                 task('Task AAA'),
                 taskResult('task-aaa'),
-                silentAssistant,
+                assistant(''),
               );
               h.assertNotifications('Task finished. Last response attached.');
             }),
@@ -223,7 +223,7 @@ describe('manual workflow', () => {
                 assistant('working...'),
                 task('Task AAA'),
                 taskResult('task-aaa', 'Done.'),
-                silentAssistant,
+                assistant(''),
               );
               h.assertNotifications('Task finished. Last response attached.');
             }),
@@ -258,7 +258,7 @@ describe('manual workflow', () => {
               assistant('working...'),
               task('Task AAA'),
               taskResult('task-aaa', 'Done.'),
-              silentAssistant,
+              assistant(''),
             );
             h.assertNotifications('Task finished. Last response attached.');
           }),
@@ -283,7 +283,7 @@ describe('manual workflow', () => {
               assistant('Done.'),
               task('Task BBB', true),
               taskResult('task-bbb', 'inner done'),
-              silentAssistant,
+              assistant(''),
             );
             h.assertNotifications('Task finished. Last response attached.');
           }).children(
@@ -295,7 +295,7 @@ describe('manual workflow', () => {
                 assistant('working...'),
                 task('Task AAA'),
                 taskResult('task-aaa'),
-                silentAssistant,
+                assistant(''),
               );
               h.assertNotifications('Task finished. Last response attached.');
             }),
@@ -318,7 +318,7 @@ describe('manual workflow', () => {
                 assistant('working...'),
                 task('Task AAA'),
                 taskResult('task-aaa', 'Done.'),
-                silentAssistant,
+                assistant(''),
               );
               h.assertNotifications('Task finished. Last response attached.');
             }),
@@ -370,7 +370,7 @@ describe('manual workflow', () => {
           assistant('working...'),
           task('Task AAA', true),
           taskResult('task-aaa', 'Done.'),
-          silentAssistant,
+          assistant(''),
         );
         h.assertNotifications('Task finished. Last response attached.');
       }).children(
@@ -382,7 +382,7 @@ describe('manual workflow', () => {
             assistant('working...'),
             task('Task AAA', true),
             taskResult('task-aaa', 'Done.'),
-            silentAssistant,
+            assistant(''),
           );
           h.assertNotifications('No pending task. Use push-task first.');
         }),
@@ -394,7 +394,7 @@ describe('manual workflow', () => {
             assistant('working...'),
             task('Task AAA', true),
             taskResult('task-aaa', 'Done.'),
-            silentAssistant,
+            assistant(''),
           );
           h.assertNotifications('No pending task to discard.');
         }),
@@ -406,7 +406,7 @@ describe('manual workflow', () => {
             assistant('working...'),
             task('Task AAA', true),
             taskResult('task-aaa', 'Done.'),
-            silentAssistant,
+            assistant(''),
           );
           h.assertNotifications('Not inside task, nothing to finish.');
         }),
@@ -418,7 +418,7 @@ describe('manual workflow', () => {
             assistant('working...'),
             task('Task AAA', true),
             taskResult('task-aaa', 'Done.'),
-            silentAssistant,
+            assistant(''),
           );
           h.assertNotifications('Not inside task, nothing to abort.');
         }),
@@ -453,7 +453,7 @@ describe('manual workflow', () => {
               assistant('working...'),
               task('Task AAA', true),
               taskResult('task-aaa', 'Done.'),
-              silentAssistant,
+              assistant(''),
             );
             h.assertNotifications('Task finished. Last response attached.');
           }),
@@ -493,7 +493,7 @@ describe('manual workflow', () => {
               assistant('working...'),
               task('Task AAA', true),
               taskResult('task-aaa', 'Done.'),
-              silentAssistant,
+              assistant(''),
             );
             h.assertNotifications('Task finished. Last response attached.');
           }),
@@ -518,7 +518,7 @@ describe('manual workflow', () => {
               assistant('Done.'),
               task('Task BBB'),
               taskResult('task-bbb', 'inner done'),
-              silentAssistant,
+              assistant(''),
             );
             h.assertNotifications('Task finished. Last response attached.');
           }).children(
@@ -530,7 +530,7 @@ describe('manual workflow', () => {
                 assistant('working...'),
                 task('Task AAA', true),
                 taskResult('task-aaa'),
-                silentAssistant,
+                assistant(''),
               );
               h.assertNotifications('Task finished. Last response attached.');
             }),
@@ -556,7 +556,7 @@ describe('manual workflow', () => {
                 assistant('working...'),
                 task('Task AAA', true),
                 taskResult('task-aaa', 'Done.'),
-                silentAssistant,
+                assistant(''),
               );
               h.assertNotifications('Task finished. Last response attached.');
             }),
@@ -597,7 +597,7 @@ describe('manual workflow', () => {
               assistant('working...'),
               task('Task AAA', true),
               taskResult('task-aaa', 'Done.'),
-              silentAssistant,
+              assistant(''),
             );
             h.assertNotifications('Task finished. Last response attached.');
           }),
@@ -628,7 +628,7 @@ describe('manual workflow', () => {
               assistant('Done.'),
               task('Task BBB', true),
               taskResult('task-bbb', 'inner done'),
-              silentAssistant,
+              assistant(''),
             );
             h.assertNotifications('Task finished. Last response attached.');
           }).children(
@@ -640,7 +640,7 @@ describe('manual workflow', () => {
                 assistant('working...'),
                 task('Task AAA', true),
                 taskResult('task-aaa'),
-                silentAssistant,
+                assistant(''),
               );
               h.assertNotifications('Task finished. Last response attached.');
             }),
@@ -666,7 +666,7 @@ describe('manual workflow', () => {
                 assistant('working...'),
                 task('Task AAA', true),
                 taskResult('task-aaa', 'Done.'),
-                silentAssistant,
+                assistant(''),
               );
               h.assertNotifications('Task finished. Last response attached.');
             }),
@@ -725,11 +725,11 @@ describe('manual workflow', () => {
   }).run();
 });
 
-// Helper: register a prompt rule for a task response
+// Helper: register a prompt rule for a task response and the follow-up turn
+// triggered when /finish-task replays that response onto the parent branch.
 function onTaskResponse(h: TestHarness, taskPrompt: string, response: string): void {
   h.engine.onPrompt(taskPrompt, responds(response));
+  h.engine.onPrompt(response, responds(''));
+  h.engine.onPrompt('', responds(''));
 }
 
-// A no-content assistant entry generated when finishTask's triggerTurn causes
-// a model call with no matching engine rule. It appears as { text: '' }.
-const silentAssistant = assistant('');

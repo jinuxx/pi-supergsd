@@ -16,9 +16,12 @@ import {
   assistant,
   assumeCommandContext,
   responds,
+  pushTask,
   task,
   taskResult,
   user,
+  userCtrlC,
+  userRunsAuto,
   TestHarness,
   ReactionEngine,
 } from './test-helpers/index.js';
@@ -28,6 +31,7 @@ describe('automated workflow', () => {
     const engine = new ReactionEngine();
     engine.onPrompt('main work', responds('working on main...'));
     engine.onPrompt('Analyze performance.', responds('Found 3 bottlenecks: ...'));
+    engine.onPrompt('Found 3 bottlenecks: ...', responds(''));
     const h = await TestHarness.create(engine);
     try {
       await h.prompt('main work');
@@ -54,15 +58,15 @@ describe('automated workflow', () => {
     const engine = new ReactionEngine();
     engine.onPrompt('main work', responds('working...'));
     engine.onPrompt('Quick fix.', responds('Fixed the bug.'));
+    engine.onPrompt('Fixed the bug.', responds(''));
+    engine.onPrompt('working...', responds(''));
     const h = await TestHarness.create(engine);
     try {
       await h.prompt('main work');
       await h.pushTask('Quick fix.', true);
       assert.strictEqual(h.getStatus(), 'pending task: quick-fix');
 
-      // Manually step through the task workflow
-      await h.prompt('/start-task');
-      await h.prompt('/finish-task');
+      await h.prompt('/auto');
 
       h.assertSessionContains(
         user('main work'),
@@ -175,6 +179,8 @@ describe('automated workflow', () => {
     const engine = new ReactionEngine();
     engine.onPrompt('start', responds(''));
     engine.onPrompt('first task', responds('done'));
+    engine.onPrompt('done', responds(''));
+    engine.onAssistant('done', userRunsAuto());
     const h = await TestHarness.create(engine);
     try {
       await h.prompt('start');
@@ -182,6 +188,7 @@ describe('automated workflow', () => {
 
       await h.prompt('/auto');
 
+      h.assertNotifications('Auto is already running.');
       h.assertSessionContains(
         user('start'),
         assistant(''),
@@ -197,14 +204,14 @@ describe('automated workflow', () => {
   it('stops when the last assistant message was aborted', async () => {
     const engine = new ReactionEngine();
     engine.onPrompt('start', responds(''));
+    engine.onPrompt('', responds(''));
     engine.onPrompt('Implement phase 1.', aborts('Stopped by user.'));
     const h = await TestHarness.create(engine);
     try {
       await h.prompt('start');
       await h.pushTask('Implement phase 1.', true);
 
-      // Manually step through to avoid /auto's LLM interaction
-      await h.prompt('/start-task');
+      await h.prompt('/auto');
 
       h.assertSessionContains(
         user('start'),
@@ -219,18 +226,51 @@ describe('automated workflow', () => {
     }
   });
 
+  it('processes a subtask pushed during a task', async () => {
+    const engine = new ReactionEngine();
+    engine.onPrompt('main work', responds('working...'));
+    engine.onPrompt('', responds(''));
+    engine.onPrompt('parent task', responds('working on parent...'), pushTask('subtask'));
+    engine.onPrompt('subtask', responds('sub done'));
+    engine.onPrompt('sub done', responds(''));
+    engine.onPrompt('working on parent...', responds(''));
+    const h = await TestHarness.create(engine);
+    try {
+      await h.prompt('main work');
+      await h.pushTask('parent task');
+
+      await h.prompt('/auto');
+
+      h.assertSessionContains(
+        user('subtask'),
+        assistant('sub done'),
+        taskResult('subtask', 'sub done'),
+      );
+      h.assertSessionContains(
+        user('main work'),
+        assistant('working...'),
+        task('parent task'),
+      );
+      h.assertNotifications('Task finished. Last response attached.');
+    } finally {
+      h.dispose();
+    }
+  });
+
   it('continues processing when user queues a steering message during auto', async () => {
     const engine = new ReactionEngine();
     engine.onPrompt('start', responds(''));
-    engine.onPrompt('Quick fix.', responds('adjusted response'));
+    engine.onPrompt('', responds(''));
+    engine.onPrompt('Quick fix.', responds('thinking...'));
+    engine.onAssistant('thinking...', { type: 'user-append', text: 'steer it' });
+    engine.onPrompt('steer it', responds('adjusted response'));
+    engine.onPrompt('adjusted response', responds(''));
     const h = await TestHarness.create(engine);
     try {
       await h.prompt('start');
       await h.pushTask('Quick fix.', true);
 
-      // Manually step through the workflow
-      await h.prompt('/start-task');
-      await h.prompt('/finish-task');
+      await h.prompt('/auto');
 
       h.assertSessionContains(
         user('start'),
@@ -247,15 +287,15 @@ describe('automated workflow', () => {
   it('stops when session is shut down during auto', async () => {
     const engine = new ReactionEngine();
     engine.onPrompt('start', responds(''));
+    engine.onPrompt('', responds(''));
     engine.onPrompt('Shutdown task', responds('working...'));
+    engine.onAssistant('working...', userCtrlC());
     const h = await TestHarness.create(engine);
     try {
       await h.prompt('start');
       await h.pushTask('Shutdown task', true);
 
-      // Manually step through the shutdown workflow
-      await h.prompt('/start-task');
-      await h.triggerSessionShutdown();
+      await h.prompt('/auto');
 
       h.assertSessionContains(
         user('start'),

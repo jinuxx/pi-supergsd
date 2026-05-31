@@ -33,20 +33,16 @@ export class FauxProvider {
   constructor(private readonly engine: ReactionEngine) {}
 
   stream = (_model: Model, context: Context): FauxEventStream => {
-    const stream = new FauxEventStream();
     const lastUser = [...context.messages].reverse().find(message => message.role === 'user');
     const promptText = lastUser ? readUserText(lastUser.content) : '';
     const responses = this.engine.matchPrompt(promptText);
 
+    if (responses.length === 0) {
+      throw new Error(`No reaction engine rule matched provider prompt: ${promptText || '<empty prompt>'}`);
+    }
 
+    const stream = new FauxEventStream();
     queueMicrotask(() => {
-      if (responses.length === 0) {
-        // No matching rule — emit only a minimal stop event without content blocks
-        const message = makeAssistantMessage([], 'stop');
-        stream.end(message);
-        return;
-      }
-
       emitPromptResponses(stream, responses);
     });
 
@@ -60,6 +56,14 @@ export class FauxProvider {
  * @earendil-works/pi-ai at runtime.
  */
 export class FauxEventStream {
+  constructor() {
+    this.resultPromise = new Promise<AssistantMessage>(resolve => {
+      this.resolveResult = resolve;
+    });
+  }
+
+  private readonly resultPromise: Promise<AssistantMessage>;
+  private resolveResult!: (result: AssistantMessage) => void;
   private readonly queue: AssistantMessageEvent[] = [];
   private waiting: Array<(event: AssistantMessageEvent) => void> = [];
   private done = false;
@@ -77,6 +81,7 @@ export class FauxEventStream {
   end(result: AssistantMessage): void {
     this.done = true;
     this.finalResult = result;
+    this.resolveResult(result);
     for (const resolve of this.waiting) {
       resolve({
         type: 'done',
@@ -102,10 +107,8 @@ export class FauxEventStream {
   }
 
   async result(): Promise<AssistantMessage> {
-    while (!this.done) {
-      await new Promise<void>(resolve => setTimeout(resolve, 10));
-    }
-    return this.finalResult!;
+    if (this.finalResult) return this.finalResult;
+    return this.resultPromise;
   }
 }
 

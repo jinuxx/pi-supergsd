@@ -83,6 +83,7 @@ describe('AgentSession-backed TestHarness foundation', () => {
     const engine = new ReactionEngine();
     engine.onPrompt('main work', responds('working...'));
     engine.onPrompt('Analyze performance.', responds('Found 3 bottlenecks: ...'));
+    engine.onPrompt('Found 3 bottlenecks: ...', responds(''));
     const h = await TestHarness.create(engine);
     try {
       await h.prompt('main work');
@@ -119,6 +120,33 @@ describe('AgentSession-backed TestHarness foundation', () => {
       h.assertBranchHistory(
         user('main work'),
         assistant('working...'),
+      );
+    } finally {
+      h.dispose();
+    }
+  });
+
+  it('fails when the faux provider receives an unmatched prompt', async () => {
+    const engine = new ReactionEngine();
+    const h = await TestHarness.create(engine);
+    try {
+      await assert.rejects(
+        async () => h.prompt('unmatched prompt'),
+        /No reaction engine rule matched provider prompt: unmatched prompt/,
+      );
+    } finally {
+      h.dispose();
+    }
+  });
+
+  it('treats empty prompt rules as exact matches', async () => {
+    const engine = new ReactionEngine();
+    engine.onPrompt('', responds(''));
+    const h = await TestHarness.create(engine);
+    try {
+      await assert.rejects(
+        async () => h.prompt('non-empty prompt'),
+        /No reaction engine rule matched provider prompt: non-empty prompt/,
       );
     } finally {
       h.dispose();
@@ -186,6 +214,7 @@ describe('AgentSession-backed TestHarness foundation', () => {
     const engine = new ReactionEngine();
     engine.onPrompt('main work', responds('working...'));
     engine.onPrompt('Analyze performance.', responds('Found 3 bottlenecks: ...'));
+    engine.onPrompt('Found 3 bottlenecks: ...', responds(''));
 
     const h = await TestHarness.create(engine);
     try {
@@ -201,8 +230,11 @@ describe('AgentSession-backed TestHarness foundation', () => {
   it('processes a subtask pushed during a task', async () => {
     const engine = new ReactionEngine();
     engine.onPrompt('main work', responds('working...'));
+    engine.onPrompt('', responds(''));
     engine.onPrompt('parent task', responds('working on parent...'), pushTask('subtask'));
     engine.onPrompt('subtask', responds('sub done'));
+    engine.onPrompt('sub done', responds(''));
+    engine.onPrompt('working on parent...', responds(''));
 
     const h = await TestHarness.create(engine);
     try {

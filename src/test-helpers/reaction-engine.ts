@@ -28,7 +28,10 @@ export class ReactionEngine {
   }
 
   matchPrompt(text: string): ResponseDescriptor[] {
-    const matched = this.promptRules.find(rule => text.includes(rule.text));
+    const matched = this.promptRules.find(rule => {
+      if (rule.text === '') return text === '';
+      return text.includes(rule.text);
+    });
     return matched ? [...matched.responses] : [];
   }
 

@@ -187,6 +187,7 @@ private commandContextActions() {
   }
 
 private async scanAndReactLoop(): Promise<void> {
+    await flushMicrotasks();
     await this.session.agent.waitForIdle();
 
     let reacted: boolean;
@@ -256,8 +257,10 @@ private async applyReaction(
   }
 
 async prompt(text: string): Promise<void> {
+    const knownEntryIds = new Set(this.sessionManager.getEntries().map(entry => entry.id));
     await this.session.prompt(text, { expandPromptTemplates: true, source: 'test' as InputSource });
     await this.session.agent.waitForIdle();
+    this.throwIfNewAssistantError(knownEntryIds);
   }
 
 async triggerSessionShutdown(): Promise<void> {
@@ -282,6 +285,19 @@ private appendSyntheticAssistantMessage(text: string, stopReason: 'stop' | 'abor
 
 private appendSyntheticTask(prompt_: string, inherit_context: boolean): void {
     this.sessionManager.appendCustomEntry('task', { prompt: prompt_, inherit_context });
+  }
+
+  private throwIfNewAssistantError(knownEntryIds: ReadonlySet<string>): void {
+    const assistantError = this.sessionManager.getEntries().find(entry => {
+      if (knownEntryIds.has(entry.id)) return false;
+      return entry.type === 'message'
+        && entry.message.role === 'assistant'
+        && entry.message.stopReason === 'error';
+    });
+
+    if (assistantError?.type === 'message' && assistantError.message.role === 'assistant') {
+      throw new Error(assistantError.message.errorMessage ?? 'Assistant turn failed.');
+    }
   }
 }
 
