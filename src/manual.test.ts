@@ -18,6 +18,7 @@ describe("manual workflow", () => {
     h.llm.onPrompt("Task AAA", responds("Done."));
     h.llm.onPrompt("Done.", responds("Great!"));
     h.llm.onPrompt("Great!", responds("Great!"));
+    h.llm.onPrompt("okay", responds("Great!"));
     h.llm.onPrompt("Task BBB", responds("inner done"));
     h.llm.onPrompt("inner done", responds("Great!"));
     await h.prompt("main work");
@@ -140,14 +141,18 @@ describe("manual workflow", () => {
           ),
         ),
         node("push BBB", async (h) => {
-          h.llm.onPrompt("some more work", pushTask("Task BBB"));
+          h.llm.onPrompt(
+            "some more work",
+            responds("okay"),
+            pushTask("Task BBB"),
+          );
           await h.prompt("some more work");
           assert.strictEqual(h.getStatus(), "pending task: task-bbb");
           h.assertBranchHistory(
             user("Task AAA"),
             assistant("Done."),
             user("some more work"),
-            assistant("", "toolUse"),
+            assistant("okay", "toolUse"),
             task("Task BBB"),
           );
           h.assertNotifications(
@@ -161,21 +166,20 @@ describe("manual workflow", () => {
               user("Task AAA"),
               assistant("Done."),
               user("some more work"),
-              assistant("", "toolUse"),
+              assistant("okay", "toolUse"),
               task("Task BBB"),
             );
             h.assertNotifications("Task discarded.");
           }).children(
             node("finish AAA", async (h) => {
-              h.llm.onPrompt("", responds(""));
               await h.prompt("/finish-task");
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA"),
-                taskResult("task-aaa"),
-                assistant(""),
+                taskResult("task-aaa", "okay"),
+                assistant("Great!"),
               );
               h.assertNotifications("Task finished. Last response attached.");
             }),
@@ -192,7 +196,7 @@ describe("manual workflow", () => {
                 user("Task AAA"),
                 assistant("Done."),
                 user("some more work"),
-                assistant("", "toolUse"),
+                assistant("okay", "toolUse"),
                 task("Task BBB"),
                 taskResult("task-bbb", "inner done"),
                 assistant("Great!"),
@@ -200,7 +204,6 @@ describe("manual workflow", () => {
               h.assertNotifications("Task finished. Last response attached.");
             }).children(
               node("finish AAA", async (h) => {
-                h.llm.onPrompt("Great!", responds("Great!"));
                 await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
@@ -220,7 +223,7 @@ describe("manual workflow", () => {
                 user("Task AAA"),
                 assistant("Done."),
                 user("some more work"),
-                assistant("", "toolUse"),
+                assistant("okay", "toolUse"),
                 task("Task BBB"),
               );
               h.assertNotifications(
@@ -228,15 +231,14 @@ describe("manual workflow", () => {
               );
             }).children(
               node("finish AAA", async (h) => {
-                h.llm.onPrompt("", responds(""));
                 await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA"),
-                  taskResult("task-aaa"),
-                  assistant(""),
+                  taskResult("task-aaa", "okay"),
+                  assistant("Great!"),
                 );
                 h.assertNotifications("Task finished. Last response attached.");
               }),
@@ -244,14 +246,18 @@ describe("manual workflow", () => {
           ),
         ),
         node("push BBB [inherit]", async (h) => {
-          h.llm.onPrompt("some more work", pushTask("Task BBB", true));
+          h.llm.onPrompt(
+            "some more work",
+            responds("okay"),
+            pushTask("Task BBB", true),
+          );
           await h.prompt("some more work");
           assert.strictEqual(h.getStatus(), "pending task: task-bbb");
           h.assertBranchHistory(
             user("Task AAA"),
             assistant("Done."),
             user("some more work"),
-            assistant("", "toolUse"),
+            assistant("okay", "toolUse"),
             task("Task BBB", true),
           );
           h.assertNotifications(
@@ -265,21 +271,20 @@ describe("manual workflow", () => {
               user("Task AAA"),
               assistant("Done."),
               user("some more work"),
-              assistant("", "toolUse"),
+              assistant("okay", "toolUse"),
               task("Task BBB", true),
             );
             h.assertNotifications("Task discarded.");
           }).children(
             node("finish AAA", async (h) => {
-              h.llm.onPrompt("", responds(""));
               await h.prompt("/finish-task");
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA"),
-                taskResult("task-aaa"),
-                assistant(""),
+                taskResult("task-aaa", "okay"),
+                assistant("Great!"),
               );
               h.assertNotifications("Task finished. Last response attached.");
             }),
@@ -291,7 +296,7 @@ describe("manual workflow", () => {
               user("Task AAA"),
               assistant("Done."),
               user("some more work"),
-              assistant("", "toolUse"),
+              assistant("okay", "toolUse"),
               task("Task BBB", true),
               user("Task BBB"),
               assistant("inner done"),
@@ -304,7 +309,7 @@ describe("manual workflow", () => {
                 user("Task AAA"),
                 assistant("Done."),
                 user("some more work"),
-                assistant("", "toolUse"),
+                assistant("okay", "toolUse"),
                 task("Task BBB", true),
                 taskResult("task-bbb", "inner done"),
                 assistant("Great!"),
@@ -312,7 +317,6 @@ describe("manual workflow", () => {
               h.assertNotifications("Task finished. Last response attached.");
             }).children(
               node("finish AAA", async (h) => {
-                h.llm.onPrompt("Great!", responds("Great!"));
                 await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
@@ -332,7 +336,7 @@ describe("manual workflow", () => {
                 user("Task AAA"),
                 assistant("Done."),
                 user("some more work"),
-                assistant("", "toolUse"),
+                assistant("okay", "toolUse"),
                 task("Task BBB", true),
               );
               h.assertNotifications(
@@ -340,15 +344,14 @@ describe("manual workflow", () => {
               );
             }).children(
               node("finish AAA", async (h) => {
-                h.llm.onPrompt("", responds(""));
                 await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA"),
-                  taskResult("task-aaa"),
-                  assistant(""),
+                  taskResult("task-aaa", "okay"),
+                  assistant("Great!"),
                 );
                 h.assertNotifications("Task finished. Last response attached.");
               }),
@@ -368,6 +371,7 @@ describe("manual workflow", () => {
     h.llm.onPrompt("Task AAA", responds("Done."));
     h.llm.onPrompt("Done.", responds("Great!"));
     h.llm.onPrompt("Great!", responds("Great!"));
+    h.llm.onPrompt("okay", responds("Great!"));
     h.llm.onPrompt("Task BBB", responds("inner done"));
     h.llm.onPrompt("inner done", responds("Great!"));
     await h.prompt("main work");
@@ -502,7 +506,11 @@ describe("manual workflow", () => {
           ),
         ),
         node("push BBB", async (h) => {
-          h.llm.onPrompt("some more work", pushTask("Task BBB"));
+          h.llm.onPrompt(
+            "some more work",
+            responds("okay"),
+            pushTask("Task BBB"),
+          );
           await h.prompt("some more work");
           assert.strictEqual(h.getStatus(), "pending task: task-bbb");
           h.assertBranchHistory(
@@ -512,7 +520,7 @@ describe("manual workflow", () => {
             user("Task AAA"),
             assistant("Done."),
             user("some more work"),
-            assistant("", "toolUse"),
+            assistant("okay", "toolUse"),
             task("Task BBB"),
           );
           h.assertNotifications(
@@ -529,21 +537,20 @@ describe("manual workflow", () => {
               user("Task AAA"),
               assistant("Done."),
               user("some more work"),
-              assistant("", "toolUse"),
+              assistant("okay", "toolUse"),
               task("Task BBB"),
             );
             h.assertNotifications("Task discarded.");
           }).children(
             node("finish AAA", async (h) => {
-              h.llm.onPrompt("", responds(""));
               await h.prompt("/finish-task");
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                taskResult("task-aaa"),
-                assistant(""),
+                taskResult("task-aaa", "okay"),
+                assistant("Great!"),
               );
               h.assertNotifications("Task finished. Last response attached.");
             }),
@@ -563,7 +570,7 @@ describe("manual workflow", () => {
                 user("Task AAA"),
                 assistant("Done."),
                 user("some more work"),
-                assistant("", "toolUse"),
+                assistant("okay", "toolUse"),
                 task("Task BBB"),
                 taskResult("task-bbb", "inner done"),
                 assistant("Great!"),
@@ -571,7 +578,6 @@ describe("manual workflow", () => {
               h.assertNotifications("Task finished. Last response attached.");
             }).children(
               node("finish AAA", async (h) => {
-                h.llm.onPrompt("Great!", responds("Great!"));
                 await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
@@ -594,7 +600,7 @@ describe("manual workflow", () => {
                 user("Task AAA"),
                 assistant("Done."),
                 user("some more work"),
-                assistant("", "toolUse"),
+                assistant("okay", "toolUse"),
                 task("Task BBB"),
               );
               h.assertNotifications(
@@ -602,15 +608,14 @@ describe("manual workflow", () => {
               );
             }).children(
               node("finish AAA", async (h) => {
-                h.llm.onPrompt("", responds(""));
                 await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA", true),
-                  taskResult("task-aaa"),
-                  assistant(""),
+                  taskResult("task-aaa", "okay"),
+                  assistant("Great!"),
                 );
                 h.assertNotifications("Task finished. Last response attached.");
               }),
@@ -618,7 +623,11 @@ describe("manual workflow", () => {
           ),
         ),
         node("push BBB [inherit]", async (h) => {
-          h.llm.onPrompt("some more work", pushTask("Task BBB", true));
+          h.llm.onPrompt(
+            "some more work",
+            responds("okay"),
+            pushTask("Task BBB", true),
+          );
           await h.prompt("some more work");
           assert.strictEqual(h.getStatus(), "pending task: task-bbb");
           h.assertBranchHistory(
@@ -628,7 +637,7 @@ describe("manual workflow", () => {
             user("Task AAA"),
             assistant("Done."),
             user("some more work"),
-            assistant("", "toolUse"),
+            assistant("okay", "toolUse"),
             task("Task BBB", true),
           );
           h.assertNotifications(
@@ -645,21 +654,20 @@ describe("manual workflow", () => {
               user("Task AAA"),
               assistant("Done."),
               user("some more work"),
-              assistant("", "toolUse"),
+              assistant("okay", "toolUse"),
               task("Task BBB", true),
             );
             h.assertNotifications("Task discarded.");
           }).children(
             node("finish AAA", async (h) => {
-              h.llm.onPrompt("", responds(""));
               await h.prompt("/finish-task");
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA", true),
-                taskResult("task-aaa"),
-                assistant(""),
+                taskResult("task-aaa", "okay"),
+                assistant("Great!"),
               );
               h.assertNotifications("Task finished. Last response attached.");
             }),
@@ -674,7 +682,7 @@ describe("manual workflow", () => {
               user("Task AAA"),
               assistant("Done."),
               user("some more work"),
-              assistant("", "toolUse"),
+              assistant("okay", "toolUse"),
               task("Task BBB", true),
               user("Task BBB"),
               assistant("inner done"),
@@ -690,7 +698,7 @@ describe("manual workflow", () => {
                 user("Task AAA"),
                 assistant("Done."),
                 user("some more work"),
-                assistant("", "toolUse"),
+                assistant("okay", "toolUse"),
                 task("Task BBB", true),
                 taskResult("task-bbb", "inner done"),
                 assistant("Great!"),
@@ -698,7 +706,6 @@ describe("manual workflow", () => {
               h.assertNotifications("Task finished. Last response attached.");
             }).children(
               node("finish AAA", async (h) => {
-                h.llm.onPrompt("Great!", responds("Great!"));
                 await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
@@ -721,7 +728,7 @@ describe("manual workflow", () => {
                 user("Task AAA"),
                 assistant("Done."),
                 user("some more work"),
-                assistant("", "toolUse"),
+                assistant("okay", "toolUse"),
                 task("Task BBB", true),
               );
               h.assertNotifications(
@@ -729,15 +736,14 @@ describe("manual workflow", () => {
               );
             }).children(
               node("finish AAA", async (h) => {
-                h.llm.onPrompt("", responds(""));
                 await h.prompt("/finish-task");
                 assert.strictEqual(h.getStatus(), undefined);
                 h.assertBranchHistory(
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA", true),
-                  taskResult("task-aaa"),
-                  assistant(""),
+                  taskResult("task-aaa", "okay"),
+                  assistant("Great!"),
                 );
                 h.assertNotifications("Task finished. Last response attached.");
               }),
