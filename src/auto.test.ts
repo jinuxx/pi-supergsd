@@ -38,7 +38,7 @@ describe('automated workflow', () => {
       await h.pushTask('Analyze performance.');
       assert.strictEqual(h.getStatus(), 'pending task: analyze-performance');
 
-      await h.prompt('/auto');
+      await h.command('/auto');
 
       h.assertTaskStatusHistoryIncludes('[auto] pending task: analyze-performance');
       h.assertSessionContains(
@@ -66,7 +66,7 @@ describe('automated workflow', () => {
       await h.pushTask('Quick fix.', true);
       assert.strictEqual(h.getStatus(), 'pending task: quick-fix');
 
-      await h.prompt('/auto');
+      await h.command('/auto');
 
       h.assertSessionContains(
         user('main work'),
@@ -89,7 +89,7 @@ describe('automated workflow', () => {
       await h.prompt('main work');
       await h.pushTask('Analyze performance.');
 
-      await h.prompt('/auto');
+      await h.command('/auto');
 
       h.assertSessionContains(
         user('main work'),
@@ -105,7 +105,7 @@ describe('automated workflow', () => {
     const engine = new ReactionEngine();
     const h = await TestHarness.create(engine);
     try {
-      await h.prompt('/auto');
+      await h.command('/auto');
       h.assertNotifications('No pending tasks to run.');
     } finally {
       h.dispose();
@@ -186,7 +186,7 @@ describe('automated workflow', () => {
       await h.prompt('start');
       await h.pushTask('first task');
 
-      await h.prompt('/auto');
+      await h.command('/auto');
 
       h.assertNotifications('Auto is already running.');
       h.assertSessionContains(
@@ -211,7 +211,7 @@ describe('automated workflow', () => {
       await h.prompt('start');
       await h.pushTask('Implement phase 1.', true);
 
-      await h.prompt('/auto');
+      await h.command('/auto');
 
       h.assertSessionContains(
         user('start'),
@@ -239,7 +239,7 @@ describe('automated workflow', () => {
       await h.prompt('main work');
       await h.pushTask('parent task');
 
-      await h.prompt('/auto');
+      await h.command('/auto');
 
       h.assertSessionContains(
         user('subtask'),
@@ -270,7 +270,7 @@ describe('automated workflow', () => {
       await h.prompt('start');
       await h.pushTask('Quick fix.', true);
 
-      await h.prompt('/auto');
+      await h.command('/auto');
 
       h.assertSessionContains(
         user('start'),
@@ -295,7 +295,7 @@ describe('automated workflow', () => {
       await h.prompt('start');
       await h.pushTask('Shutdown task', true);
 
-      await h.prompt('/auto');
+      await h.command('/auto');
 
       h.assertSessionContains(
         user('start'),

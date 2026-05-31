@@ -234,7 +234,7 @@ private async applyReaction(
       return;
     }
     if (reaction.type === 'user-runs-auto') {
-      await this.prompt('/auto');
+      await this.command('/auto');
       return;
     }
     if (reaction.type === 'user-append') {
@@ -256,14 +256,15 @@ private async applyReaction(
     this.appendSyntheticTask(reaction.prompt, reaction.inherit_context);
   }
 
-async prompt(text: string): Promise<void> {
-    const knownEntryIds = new Set(this.sessionManager.getEntries().map(entry => entry.id));
-    await this.session.prompt(text, { expandPromptTemplates: true, source: 'test' as InputSource });
-    await this.session.agent.waitForIdle();
-    this.throwIfNewAssistantError(knownEntryIds);
+  async prompt(text: string): Promise<void> {
+    await this.sendPrompt(text, false);
   }
 
-async triggerSessionShutdown(): Promise<void> {
+  async command(text: string): Promise<void> {
+    await this.sendPrompt(text, true);
+  }
+
+  async triggerSessionShutdown(): Promise<void> {
     await this.session.extensionRunner.emit({
       type: 'session_shutdown',
       reason: 'quit',
@@ -285,6 +286,13 @@ private appendSyntheticAssistantMessage(text: string, stopReason: 'stop' | 'abor
 
 private appendSyntheticTask(prompt_: string, inherit_context: boolean): void {
     this.sessionManager.appendCustomEntry('task', { prompt: prompt_, inherit_context });
+  }
+
+  private async sendPrompt(text: string, expandPromptTemplates: boolean): Promise<void> {
+    const knownEntryIds = new Set(this.sessionManager.getEntries().map(entry => entry.id));
+    await this.session.prompt(text, { expandPromptTemplates, source: 'test' as InputSource });
+    await this.session.agent.waitForIdle();
+    this.throwIfNewAssistantError(knownEntryIds);
   }
 
   private throwIfNewAssistantError(knownEntryIds: ReadonlySet<string>): void {

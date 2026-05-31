@@ -26,7 +26,7 @@ describe('manual workflow', () => {
     h.assertNotifications('Task stored. Use `/start-task` or `/auto` to start it.');
   }).children(
     node('discard AAA', async (h) => {
-      await h.prompt('/discard-task');
+      await h.command('/discard-task');
       assert.strictEqual(h.getStatus(), undefined);
       h.assertBranchHistory(
         user('main work'),
@@ -37,7 +37,7 @@ describe('manual workflow', () => {
     }),
     node('start AAA', async (h) => {
       onTaskResponse(h, 'Task AAA', 'Done.');
-      await h.prompt('/start-task');
+      await h.command('/start-task');
       assert.strictEqual(h.getStatus(), 'current task: task-aaa');
       h.assertBranchHistory(
         user('Task AAA'),
@@ -45,7 +45,7 @@ describe('manual workflow', () => {
       );
     }).children(
       node('finish AAA', async (h) => {
-        await h.prompt('/finish-task');
+        await h.command('/finish-task');
         assert.strictEqual(h.getStatus(), undefined);
         h.assertBranchHistory(
           user('main work'),
@@ -57,7 +57,7 @@ describe('manual workflow', () => {
         h.assertNotifications('Task finished. Last response attached.');
       }).children(
         node('start [no task]', async (h) => {
-          await h.prompt('/start-task');
+          await h.command('/start-task');
           assert.strictEqual(h.getStatus(), undefined);
           h.assertBranchHistory(
             user('main work'),
@@ -69,7 +69,7 @@ describe('manual workflow', () => {
           h.assertNotifications('No pending task. Use push-task first.');
         }),
         node('discard [no task]', async (h) => {
-          await h.prompt('/discard-task');
+          await h.command('/discard-task');
           assert.strictEqual(h.getStatus(), undefined);
           h.assertBranchHistory(
             user('main work'),
@@ -81,7 +81,7 @@ describe('manual workflow', () => {
           h.assertNotifications('No pending task to discard.');
         }),
         node('finish [no task]', async (h) => {
-          await h.prompt('/finish-task');
+          await h.command('/finish-task');
           assert.strictEqual(h.getStatus(), undefined);
           h.assertBranchHistory(
             user('main work'),
@@ -93,7 +93,7 @@ describe('manual workflow', () => {
           h.assertNotifications('Not inside task, nothing to finish.');
         }),
         node('abort [no task]', async (h) => {
-          await h.prompt('/abort-task');
+          await h.command('/abort-task');
           assert.strictEqual(h.getStatus(), undefined);
           h.assertBranchHistory(
             user('main work'),
@@ -106,7 +106,7 @@ describe('manual workflow', () => {
         }),
       ),
       node('abort AAA', async (h) => {
-        await h.prompt('/abort-task');
+        await h.command('/abort-task');
         assert.strictEqual(h.getStatus(), 'pending task: task-aaa');
         h.assertBranchHistory(
           user('main work'),
@@ -117,7 +117,7 @@ describe('manual workflow', () => {
       }).children(
         node('start AAA', async (h) => {
           onTaskResponse(h, 'Task AAA', 'Done.');
-          await h.prompt('/start-task');
+          await h.command('/start-task');
           assert.strictEqual(h.getStatus(), 'current task: task-aaa');
           h.assertBranchHistory(
             user('Task AAA'),
@@ -125,7 +125,7 @@ describe('manual workflow', () => {
           );
         }).children(
           node('finish AAA', async (h) => {
-            await h.prompt('/finish-task');
+            await h.command('/finish-task');
             assert.strictEqual(h.getStatus(), undefined);
             h.assertBranchHistory(
               user('main work'),
@@ -149,7 +149,7 @@ describe('manual workflow', () => {
         h.assertNotifications('Task stored. Use `/start-task` or `/auto` to start it.');
       }).children(
         node('discard BBB', async (h) => {
-          await h.prompt('/discard-task');
+          await h.command('/discard-task');
           assert.strictEqual(h.getStatus(), 'current task: task-aaa');
           h.assertBranchHistory(
             user('Task AAA'),
@@ -159,7 +159,7 @@ describe('manual workflow', () => {
           h.assertNotifications('Task discarded.');
         }).children(
           node('finish AAA', async (h) => {
-            await h.prompt('/finish-task');
+            await h.command('/finish-task');
             assert.strictEqual(h.getStatus(), undefined);
             h.assertBranchHistory(
               user('main work'),
@@ -173,7 +173,7 @@ describe('manual workflow', () => {
         ),
         node('start BBB', async (h) => {
           onTaskResponse(h, 'Task BBB', 'inner done');
-          await h.prompt('/start-task');
+          await h.command('/start-task');
           assert.strictEqual(h.getStatus(), 'current task: task-bbb');
           h.assertBranchHistory(
             user('Task BBB'),
@@ -181,7 +181,7 @@ describe('manual workflow', () => {
           );
         }).children(
           node('finish BBB', async (h) => {
-            await h.prompt('/finish-task');
+            await h.command('/finish-task');
             assert.strictEqual(h.getStatus(), 'current task: task-aaa');
             h.assertBranchHistory(
               user('Task AAA'),
@@ -193,7 +193,8 @@ describe('manual workflow', () => {
             h.assertNotifications('Task finished. Last response attached.');
           }).children(
             node('finish AAA', async (h) => {
-              await h.prompt('/finish-task');
+              expectBlankPrompt(h);
+              await h.command('/finish-task');
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user('main work'),
@@ -206,7 +207,7 @@ describe('manual workflow', () => {
             }),
           ),
           node('abort BBB', async (h) => {
-            await h.prompt('/abort-task');
+            await h.command('/abort-task');
             assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
             h.assertBranchHistory(
               user('Task AAA'),
@@ -216,7 +217,7 @@ describe('manual workflow', () => {
             h.assertNotifications('Task aborted. Branch abandoned without summary.');
           }).children(
             node('finish AAA', async (h) => {
-              await h.prompt('/finish-task');
+              await h.command('/finish-task');
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user('main work'),
@@ -241,7 +242,7 @@ describe('manual workflow', () => {
         h.assertNotifications('Task stored. Use `/start-task` or `/auto` to start it.');
       }).children(
         node('discard BBB [inherit]', async (h) => {
-          await h.prompt('/discard-task');
+          await h.command('/discard-task');
           assert.strictEqual(h.getStatus(), 'current task: task-aaa');
           h.assertBranchHistory(
             user('Task AAA'),
@@ -251,7 +252,7 @@ describe('manual workflow', () => {
           h.assertNotifications('Task discarded.');
         }).children(
           node('finish AAA', async (h) => {
-            await h.prompt('/finish-task');
+            await h.command('/finish-task');
             assert.strictEqual(h.getStatus(), undefined);
             h.assertBranchHistory(
               user('main work'),
@@ -265,7 +266,7 @@ describe('manual workflow', () => {
         ),
         node('start BBB [inherit]', async (h) => {
           onTaskResponse(h, 'Task BBB', 'inner done');
-          await h.prompt('/start-task');
+          await h.command('/start-task');
           assert.strictEqual(h.getStatus(), 'current task: task-bbb');
           h.assertBranchHistory(
             user('Task AAA'),
@@ -276,7 +277,7 @@ describe('manual workflow', () => {
           );
         }).children(
           node('finish BBB [inherit]', async (h) => {
-            await h.prompt('/finish-task');
+            await h.command('/finish-task');
             assert.strictEqual(h.getStatus(), 'current task: task-aaa');
             h.assertBranchHistory(
               user('Task AAA'),
@@ -288,7 +289,8 @@ describe('manual workflow', () => {
             h.assertNotifications('Task finished. Last response attached.');
           }).children(
             node('finish AAA', async (h) => {
-              await h.prompt('/finish-task');
+              expectBlankPrompt(h);
+              await h.command('/finish-task');
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user('main work'),
@@ -301,7 +303,7 @@ describe('manual workflow', () => {
             }),
           ),
           node('abort BBB [inherit]', async (h) => {
-            await h.prompt('/abort-task');
+            await h.command('/abort-task');
             assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
             h.assertBranchHistory(
               user('Task AAA'),
@@ -311,7 +313,7 @@ describe('manual workflow', () => {
             h.assertNotifications('Task aborted. Branch abandoned without summary.');
           }).children(
             node('finish AAA', async (h) => {
-              await h.prompt('/finish-task');
+              await h.command('/finish-task');
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user('main work'),
@@ -341,7 +343,7 @@ describe('manual workflow', () => {
     h.assertNotifications('Task stored. Use `/start-task` or `/auto` to start it.');
   }).children(
     node('discard AAA', async (h) => {
-      await h.prompt('/discard-task');
+      await h.command('/discard-task');
       assert.strictEqual(h.getStatus(), undefined);
       h.assertBranchHistory(
         user('main work'),
@@ -352,7 +354,7 @@ describe('manual workflow', () => {
     }),
     node('start AAA', async (h) => {
       onTaskResponse(h, 'Task AAA', 'Done.');
-      await h.prompt('/start-task');
+      await h.command('/start-task');
       assert.strictEqual(h.getStatus(), 'current task: task-aaa');
       h.assertBranchHistory(
         user('main work'),
@@ -363,7 +365,7 @@ describe('manual workflow', () => {
       );
     }).children(
       node('finish AAA', async (h) => {
-        await h.prompt('/finish-task');
+        await h.command('/finish-task');
         assert.strictEqual(h.getStatus(), undefined);
         h.assertBranchHistory(
           user('main work'),
@@ -375,7 +377,7 @@ describe('manual workflow', () => {
         h.assertNotifications('Task finished. Last response attached.');
       }).children(
         node('start [no task]', async (h) => {
-          await h.prompt('/start-task');
+          await h.command('/start-task');
           assert.strictEqual(h.getStatus(), undefined);
           h.assertBranchHistory(
             user('main work'),
@@ -387,7 +389,7 @@ describe('manual workflow', () => {
           h.assertNotifications('No pending task. Use push-task first.');
         }),
         node('discard [no task]', async (h) => {
-          await h.prompt('/discard-task');
+          await h.command('/discard-task');
           assert.strictEqual(h.getStatus(), undefined);
           h.assertBranchHistory(
             user('main work'),
@@ -399,7 +401,7 @@ describe('manual workflow', () => {
           h.assertNotifications('No pending task to discard.');
         }),
         node('finish [no task]', async (h) => {
-          await h.prompt('/finish-task');
+          await h.command('/finish-task');
           assert.strictEqual(h.getStatus(), undefined);
           h.assertBranchHistory(
             user('main work'),
@@ -411,7 +413,7 @@ describe('manual workflow', () => {
           h.assertNotifications('Not inside task, nothing to finish.');
         }),
         node('abort [no task]', async (h) => {
-          await h.prompt('/abort-task');
+          await h.command('/abort-task');
           assert.strictEqual(h.getStatus(), undefined);
           h.assertBranchHistory(
             user('main work'),
@@ -424,7 +426,7 @@ describe('manual workflow', () => {
         }),
       ),
       node('abort AAA', async (h) => {
-        await h.prompt('/abort-task');
+        await h.command('/abort-task');
         assert.strictEqual(h.getStatus(), 'pending task: task-aaa');
         h.assertBranchHistory(
           user('main work'),
@@ -435,7 +437,7 @@ describe('manual workflow', () => {
       }).children(
         node('start AAA', async (h) => {
           onTaskResponse(h, 'Task AAA', 'Done.');
-          await h.prompt('/start-task');
+          await h.command('/start-task');
           assert.strictEqual(h.getStatus(), 'current task: task-aaa');
           h.assertBranchHistory(
             user('main work'),
@@ -446,7 +448,7 @@ describe('manual workflow', () => {
           );
         }).children(
           node('finish AAA', async (h) => {
-            await h.prompt('/finish-task');
+            await h.command('/finish-task');
             assert.strictEqual(h.getStatus(), undefined);
             h.assertBranchHistory(
               user('main work'),
@@ -473,7 +475,7 @@ describe('manual workflow', () => {
         h.assertNotifications('Task stored. Use `/start-task` or `/auto` to start it.');
       }).children(
         node('discard BBB', async (h) => {
-          await h.prompt('/discard-task');
+          await h.command('/discard-task');
           assert.strictEqual(h.getStatus(), 'current task: task-aaa');
           h.assertBranchHistory(
             user('main work'),
@@ -486,7 +488,7 @@ describe('manual workflow', () => {
           h.assertNotifications('Task discarded.');
         }).children(
           node('finish AAA', async (h) => {
-            await h.prompt('/finish-task');
+            await h.command('/finish-task');
             assert.strictEqual(h.getStatus(), undefined);
             h.assertBranchHistory(
               user('main work'),
@@ -500,7 +502,7 @@ describe('manual workflow', () => {
         ),
         node('start BBB', async (h) => {
           onTaskResponse(h, 'Task BBB', 'inner done');
-          await h.prompt('/start-task');
+          await h.command('/start-task');
           assert.strictEqual(h.getStatus(), 'current task: task-bbb');
           h.assertBranchHistory(
             user('Task BBB'),
@@ -508,7 +510,7 @@ describe('manual workflow', () => {
           );
         }).children(
           node('finish BBB', async (h) => {
-            await h.prompt('/finish-task');
+            await h.command('/finish-task');
             assert.strictEqual(h.getStatus(), 'current task: task-aaa');
             h.assertBranchHistory(
               user('main work'),
@@ -523,7 +525,8 @@ describe('manual workflow', () => {
             h.assertNotifications('Task finished. Last response attached.');
           }).children(
             node('finish AAA', async (h) => {
-              await h.prompt('/finish-task');
+              expectBlankPrompt(h);
+              await h.command('/finish-task');
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user('main work'),
@@ -536,7 +539,7 @@ describe('manual workflow', () => {
             }),
           ),
           node('abort BBB', async (h) => {
-            await h.prompt('/abort-task');
+            await h.command('/abort-task');
             assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
             h.assertBranchHistory(
               user('main work'),
@@ -549,7 +552,7 @@ describe('manual workflow', () => {
             h.assertNotifications('Task aborted. Branch abandoned without summary.');
           }).children(
             node('finish AAA', async (h) => {
-              await h.prompt('/finish-task');
+              await h.command('/finish-task');
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user('main work'),
@@ -577,7 +580,7 @@ describe('manual workflow', () => {
         h.assertNotifications('Task stored. Use `/start-task` or `/auto` to start it.');
       }).children(
         node('discard BBB [inherit]', async (h) => {
-          await h.prompt('/discard-task');
+          await h.command('/discard-task');
           assert.strictEqual(h.getStatus(), 'current task: task-aaa');
           h.assertBranchHistory(
             user('main work'),
@@ -590,7 +593,7 @@ describe('manual workflow', () => {
           h.assertNotifications('Task discarded.');
         }).children(
           node('finish AAA', async (h) => {
-            await h.prompt('/finish-task');
+            await h.command('/finish-task');
             assert.strictEqual(h.getStatus(), undefined);
             h.assertBranchHistory(
               user('main work'),
@@ -604,7 +607,7 @@ describe('manual workflow', () => {
         ),
         node('start BBB [inherit]', async (h) => {
           onTaskResponse(h, 'Task BBB', 'inner done');
-          await h.prompt('/start-task');
+          await h.command('/start-task');
           assert.strictEqual(h.getStatus(), 'current task: task-bbb');
           h.assertBranchHistory(
             user('main work'),
@@ -618,7 +621,7 @@ describe('manual workflow', () => {
           );
         }).children(
           node('finish BBB [inherit]', async (h) => {
-            await h.prompt('/finish-task');
+            await h.command('/finish-task');
             assert.strictEqual(h.getStatus(), 'current task: task-aaa');
             h.assertBranchHistory(
               user('main work'),
@@ -633,7 +636,8 @@ describe('manual workflow', () => {
             h.assertNotifications('Task finished. Last response attached.');
           }).children(
             node('finish AAA', async (h) => {
-              await h.prompt('/finish-task');
+              expectBlankPrompt(h);
+              await h.command('/finish-task');
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user('main work'),
@@ -646,7 +650,7 @@ describe('manual workflow', () => {
             }),
           ),
           node('abort BBB [inherit]', async (h) => {
-            await h.prompt('/abort-task');
+            await h.command('/abort-task');
             assert.strictEqual(h.getStatus(), 'pending task: task-bbb');
             h.assertBranchHistory(
               user('main work'),
@@ -659,7 +663,7 @@ describe('manual workflow', () => {
             h.assertNotifications('Task aborted. Branch abandoned without summary.');
           }).children(
             node('finish AAA', async (h) => {
-              await h.prompt('/finish-task');
+              await h.command('/finish-task');
               assert.strictEqual(h.getStatus(), undefined);
               h.assertBranchHistory(
                 user('main work'),
@@ -679,7 +683,7 @@ describe('manual workflow', () => {
   node('start [no task]', async (h) => {
     h.engine.onPrompt('main work', responds('working...'));
     await h.prompt('main work');
-    await h.prompt('/start-task');
+    await h.command('/start-task');
     assert.strictEqual(h.getStatus(), undefined);
     h.assertBranchHistory(
       user('main work'),
@@ -691,7 +695,7 @@ describe('manual workflow', () => {
   node('discard [no task]', async (h) => {
     h.engine.onPrompt('main work', responds('working...'));
     await h.prompt('main work');
-    await h.prompt('/discard-task');
+    await h.command('/discard-task');
     assert.strictEqual(h.getStatus(), undefined);
     h.assertBranchHistory(
       user('main work'),
@@ -703,7 +707,7 @@ describe('manual workflow', () => {
   node('finish [no task]', async (h) => {
     h.engine.onPrompt('main work', responds('working...'));
     await h.prompt('main work');
-    await h.prompt('/finish-task');
+    await h.command('/finish-task');
     assert.strictEqual(h.getStatus(), undefined);
     h.assertBranchHistory(
       user('main work'),
@@ -715,7 +719,7 @@ describe('manual workflow', () => {
   node('abort [no task]', async (h) => {
     h.engine.onPrompt('main work', responds('working...'));
     await h.prompt('main work');
-    await h.prompt('/abort-task');
+    await h.command('/abort-task');
     assert.strictEqual(h.getStatus(), undefined);
     h.assertBranchHistory(
       user('main work'),
@@ -730,6 +734,9 @@ describe('manual workflow', () => {
 function onTaskResponse(h: TestHarness, taskPrompt: string, response: string): void {
   h.engine.onPrompt(taskPrompt, responds(response));
   h.engine.onPrompt(response, responds(''));
+}
+
+function expectBlankPrompt(h: TestHarness): void {
   h.engine.onPrompt('', responds(''));
 }
 

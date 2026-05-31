@@ -41,6 +41,21 @@ describe('AgentSession-backed TestHarness foundation', () => {
     }
   });
 
+  it('treats slash-prefixed prompts literally by default', async () => {
+    const engine = new ReactionEngine();
+    engine.onPrompt('/start-task', responds('literal slash prompt'));
+    const h = await TestHarness.create(engine);
+    try {
+      await h.prompt('/start-task');
+      h.assertBranchHistory(
+        user('/start-task'),
+        assistant('literal slash prompt'),
+      );
+    } finally {
+      h.dispose();
+    }
+  });
+
   it('supports thinking and aborted response descriptors', async () => {
     const engine = new ReactionEngine();
     engine.onPrompt('think', thinks('checking context'));
@@ -88,7 +103,7 @@ describe('AgentSession-backed TestHarness foundation', () => {
     try {
       await h.prompt('main work');
       await h.pushTask('Analyze performance.');
-      await h.prompt('/auto');
+      await h.command('/auto');
       h.assertSessionContains(taskResult('analyze-performance', 'Found 3 bottlenecks: ...'));
     } finally {
       h.dispose();
@@ -103,7 +118,7 @@ describe('AgentSession-backed TestHarness foundation', () => {
     try {
       await h.prompt('main work');
       await h.pushTask('Cancel before navigation.');
-      await h.prompt('/auto');
+      await h.command('/auto');
       h.assertSessionContains(task('Cancel before navigation.'));
     } finally {
       h.dispose();
@@ -133,6 +148,20 @@ describe('AgentSession-backed TestHarness foundation', () => {
       await assert.rejects(
         async () => h.prompt('unmatched prompt'),
         /No reaction engine rule matched provider prompt: unmatched prompt/,
+      );
+    } finally {
+      h.dispose();
+    }
+  });
+
+  it('fails loudly when /start-task hits an unmatched provider prompt', async () => {
+    const engine = new ReactionEngine();
+    const h = await TestHarness.create(engine);
+    try {
+      await h.pushTask('Task AAA');
+      await assert.rejects(
+        async () => h.command('/start-task'),
+        /No reaction engine rule matched provider prompt: Task AAA/,
       );
     } finally {
       h.dispose();
@@ -178,7 +207,7 @@ describe('AgentSession-backed TestHarness foundation', () => {
     const engine = new ReactionEngine();
     const h = await TestHarness.create(engine);
     try {
-      await h.prompt('/start-task');
+      await h.command('/start-task');
       h.assertNotificationEntries([
         { message: 'No pending task. Use push-task first.', level: 'warning' },
       ]);
@@ -220,7 +249,7 @@ describe('AgentSession-backed TestHarness foundation', () => {
     try {
       await h.prompt('main work');
       await h.pushTask('Analyze performance.');
-      await h.prompt('/auto');
+      await h.command('/auto');
       h.assertSessionContains(taskResult('analyze-performance', 'Found 3 bottlenecks: ...'));
     } finally {
       h.dispose();
@@ -240,7 +269,7 @@ describe('AgentSession-backed TestHarness foundation', () => {
     try {
       await h.prompt('main work');
       await h.pushTask('parent task');
-      await h.prompt('/auto');
+      await h.command('/auto');
 
       h.assertSessionContains(
         user('subtask'),
