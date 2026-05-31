@@ -233,9 +233,7 @@ describe("manual workflow", () => {
                   taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications(
-                  "Task finished. Last response attached.",
-                );
+                h.assertNotifications("Task finished. Last response attached.");
               }),
             ),
             node("abort BBB", async (h) => {
@@ -265,18 +263,13 @@ describe("manual workflow", () => {
                   taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications(
-                  "Task finished. Last response attached.",
-                );
+                h.assertNotifications("Task finished. Last response attached.");
               }),
             ),
           ),
         ),
         node("push BBB [inherit]", async (h) => {
-          h.llm.onPrompt(
-            "queue BBB [inherit]",
-            pushTask("Task BBB", true),
-          );
+          h.llm.onPrompt("queue BBB [inherit]", pushTask("Task BBB", true));
           await h.prompt("queue BBB [inherit]");
           assert.strictEqual(h.getStatus(), "pending task: task-bbb");
           h.assertBranchHistory(
@@ -315,9 +308,7 @@ describe("manual workflow", () => {
                 taskResult("task-aaa"),
                 assistant(""),
               );
-              h.assertNotifications(
-                "Task finished. Last response attached.",
-              );
+              h.assertNotifications("Task finished. Last response attached.");
             }),
           ),
           node("start BBB [inherit]", async (h) => {
@@ -346,9 +337,7 @@ describe("manual workflow", () => {
                 taskResult("task-bbb", "inner done"),
                 assistant(""),
               );
-              h.assertNotifications(
-                "Task finished. Last response attached.",
-              );
+              h.assertNotifications("Task finished. Last response attached.");
             }).children(
               node("finish AAA", async (h) => {
                 expectBlankPrompt(h);
@@ -363,9 +352,7 @@ describe("manual workflow", () => {
                   taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications(
-                  "Task finished. Last response attached.",
-                );
+                h.assertNotifications("Task finished. Last response attached.");
               }),
             ),
             node("abort BBB [inherit]", async (h) => {
@@ -395,9 +382,7 @@ describe("manual workflow", () => {
                   taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications(
-                  "Task finished. Last response attached.",
-                );
+                h.assertNotifications("Task finished. Last response attached.");
               }),
             ),
           ),
@@ -561,9 +546,7 @@ describe("manual workflow", () => {
                 taskResult("task-aaa", "Done."),
                 assistant(""),
               );
-              h.assertNotifications(
-                "Task finished. Last response attached.",
-              );
+              h.assertNotifications("Task finished. Last response attached.");
             }),
           ),
         ),
@@ -617,9 +600,7 @@ describe("manual workflow", () => {
                 taskResult("task-aaa"),
                 assistant(""),
               );
-              h.assertNotifications(
-                "Task finished. Last response attached.",
-              );
+              h.assertNotifications("Task finished. Last response attached.");
             }),
           ),
           node("start BBB", async (h) => {
@@ -645,9 +626,7 @@ describe("manual workflow", () => {
                 taskResult("task-bbb", "inner done"),
                 assistant(""),
               );
-              h.assertNotifications(
-                "Task finished. Last response attached.",
-              );
+              h.assertNotifications("Task finished. Last response attached.");
             }).children(
               node("finish AAA", async (h) => {
                 expectBlankPrompt(h);
@@ -662,9 +641,7 @@ describe("manual workflow", () => {
                   taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications(
-                  "Task finished. Last response attached.",
-                );
+                h.assertNotifications("Task finished. Last response attached.");
               }),
             ),
             node("abort BBB", async (h) => {
@@ -699,18 +676,13 @@ describe("manual workflow", () => {
                   taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications(
-                  "Task finished. Last response attached.",
-                );
+                h.assertNotifications("Task finished. Last response attached.");
               }),
             ),
           ),
         ),
         node("push BBB [inherit]", async (h) => {
-          h.llm.onPrompt(
-            "queue BBB [inherit]",
-            pushTask("Task BBB", true),
-          );
+          h.llm.onPrompt("queue BBB [inherit]", pushTask("Task BBB", true));
           await h.prompt("queue BBB [inherit]");
           assert.strictEqual(h.getStatus(), "pending task: task-bbb");
           h.assertBranchHistory(
@@ -759,9 +731,7 @@ describe("manual workflow", () => {
                 taskResult("task-aaa"),
                 assistant(""),
               );
-              h.assertNotifications(
-                "Task finished. Last response attached.",
-              );
+              h.assertNotifications("Task finished. Last response attached.");
             }),
           ),
           node("start BBB [inherit]", async (h) => {
@@ -800,9 +770,7 @@ describe("manual workflow", () => {
                 taskResult("task-bbb", "inner done"),
                 assistant(""),
               );
-              h.assertNotifications(
-                "Task finished. Last response attached.",
-              );
+              h.assertNotifications("Task finished. Last response attached.");
             }).children(
               node("finish AAA", async (h) => {
                 expectBlankPrompt(h);
@@ -817,9 +785,7 @@ describe("manual workflow", () => {
                   taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications(
-                  "Task finished. Last response attached.",
-                );
+                h.assertNotifications("Task finished. Last response attached.");
               }),
             ),
             node("abort BBB [inherit]", async (h) => {
@@ -854,9 +820,7 @@ describe("manual workflow", () => {
                   taskResult("task-aaa"),
                   assistant(""),
                 );
-                h.assertNotifications(
-                  "Task finished. Last response attached.",
-                );
+                h.assertNotifications("Task finished. Last response attached.");
               }),
             ),
           ),

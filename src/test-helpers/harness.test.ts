@@ -10,8 +10,6 @@ import {
   task,
   thinks,
   user,
-  userCtrlC,
-  userEsc,
   userPrompts,
   TestHarness,
 } from "./index.js";

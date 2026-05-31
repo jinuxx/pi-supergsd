@@ -1,13 +1,7 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
 
-import {
-  MockLLM,
-  aborts,
-  pushTask,
-  responds,
-  thinks,
-} from "./mock-llm.js";
+import { MockLLM, aborts, pushTask, responds, thinks } from "./index.js";
 
 describe("MockLLM", () => {
   it("uses the first matching prompt rule", () => {
@@ -15,7 +9,9 @@ describe("MockLLM", () => {
     llm.onPrompt("task", responds("first"));
     llm.onPrompt("task", responds("second"));
 
-    assert.deepStrictEqual(llm.matchPrompt("run task now"), [responds("first")]);
+    assert.deepStrictEqual(llm.matchPrompt("run task now"), [
+      responds("first"),
+    ]);
   });
 
   it("treats the empty prompt as an exact-match-only rule", () => {

@@ -15,7 +15,6 @@ import {
 
 // eslint-disable-next-line unslop/import-control -- extension factory not available via src test-helpers import chain
 import registerSuperGsd from "../../index.js";
-import { updateTaskStatus } from "../index.js";
 import { extractTextContent } from "../text-content.js";
 import { assertBranchHistory, assertSessionContains } from "./assertions.js";
 import type { BranchEntry } from "./descriptors.js";
@@ -32,10 +31,9 @@ export class TestHarness {
     private readonly sessionManager: SessionManager,
     private readonly ui: TestUI,
     private readonly fauxProvider: FauxProvider,
+    private seenReactionEntryIds = new Set<string>(),
+    private cancelNextNav = false,
   ) {}
-
-  private cancelNextNav = false;
-  private readonly seenReactionEntryIds = new Set<string>();
 
   static async create(): Promise<TestHarness> {
     const cwd = process.cwd();
@@ -192,19 +190,6 @@ export class TestHarness {
     };
   }
 
-  async prompt(text: string): Promise<void> {
-    const knownEntryIds = new Set(
-      this.sessionManager.getEntries().map((entry) => entry.id),
-    );
-
-    await this.session.prompt(text, {
-      expandPromptTemplates: true,
-      source: "test" as InputSource,
-    });
-    await this.session.agent.waitForIdle();
-    this.throwIfNewAssistantError(knownEntryIds);
-  }
-
   private async scanAndReactLoop(): Promise<void> {
     await flushMicrotasks();
     await this.session.agent.waitForIdle();
@@ -253,6 +238,19 @@ export class TestHarness {
         await this.prompt(action.text);
         return;
     }
+  }
+
+  async prompt(text: string): Promise<void> {
+    const knownEntryIds = new Set(
+      this.sessionManager.getEntries().map((entry) => entry.id),
+    );
+
+    await this.session.prompt(text, {
+      expandPromptTemplates: true,
+      source: "test" as InputSource,
+    });
+    await this.session.agent.waitForIdle();
+    this.throwIfNewAssistantError(knownEntryIds);
   }
 
   private throwIfNewAssistantError(knownEntryIds: ReadonlySet<string>): void {

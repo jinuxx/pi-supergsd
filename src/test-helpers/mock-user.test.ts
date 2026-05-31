@@ -1,12 +1,7 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
 
-import {
-  MockUser,
-  userCtrlC,
-  userEsc,
-  userPrompts,
-} from "./mock-user.js";
+import { MockUser, userCtrlC, userEsc, userPrompts } from "./index.js";
 
 describe("MockUser", () => {
   it("uses the first matching assistant rule", () => {
@@ -23,9 +18,7 @@ describe("MockUser", () => {
     const user = new MockUser();
     user.onQueuedTask("Task BBB", userCtrlC());
 
-    assert.deepStrictEqual(user.matchQueuedTask("Task BBB"), [
-      userCtrlC(),
-    ]);
+    assert.deepStrictEqual(user.matchQueuedTask("Task BBB"), [userCtrlC()]);
     assert.deepStrictEqual(user.matchQueuedTask("prefix Task BBB suffix"), [
       userCtrlC(),
     ]);

@@ -1,3 +1,26 @@
+export class MockLLM {
+  private readonly promptRules: PromptRule[] = [];
+
+  onPrompt(text: string, ...responses: MockLLMDescriptor[]): void {
+    this.promptRules.push({ text, responses });
+  }
+
+  matchPrompt(text: string): MockLLMDescriptor[] {
+    const matched = this.promptRules.find((rule) => {
+      if (rule.text === "") return text === "";
+      return text.includes(rule.text);
+    });
+
+    if (!matched) {
+      throw new Error(
+        `No MockLLM rule matched provider prompt: ${text || "<empty prompt>"}`,
+      );
+    }
+
+    return [...matched.responses];
+  }
+}
+
 export type MockLLMDescriptor =
   | ReturnType<typeof responds>
   | ReturnType<typeof thinks>
@@ -29,26 +52,3 @@ type PromptRule = {
   text: string;
   responses: MockLLMDescriptor[];
 };
-
-export class MockLLM {
-  private readonly promptRules: PromptRule[] = [];
-
-  onPrompt(text: string, ...responses: MockLLMDescriptor[]): void {
-    this.promptRules.push({ text, responses });
-  }
-
-  matchPrompt(text: string): MockLLMDescriptor[] {
-    const matched = this.promptRules.find((rule) => {
-      if (rule.text === "") return text === "";
-      return text.includes(rule.text);
-    });
-
-    if (!matched) {
-      throw new Error(
-        `No MockLLM rule matched provider prompt: ${text || "<empty prompt>"}`,
-      );
-    }
-
-    return [...matched.responses];
-  }
-}
