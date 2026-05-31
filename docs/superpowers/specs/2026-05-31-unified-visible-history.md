@@ -172,9 +172,11 @@ Its post-refactor signature should be:
 assertSessionContains(...expected: DurableSessionEntry[]): void
 ```
 
-It continues to assert against durable session-derived visible entries only. Notifications are excluded because they are ephemeral UI effects, not persisted session data.
+It retains its current whole-session semantics by searching durable session-derived visible entries from `sessionManager.getEntries()`, not just the current branch. Notifications are excluded because they are ephemeral UI effects, not persisted session data.
 
-`assertNotificationEntries(...)` should be removed as part of this refactor. If a narrow internal test still needs to verify raw UI-notification metadata during the transition, that should happen in focused `TestSession` tests rather than through a retained public harness assertion.
+This is intentionally different from `assertSession(...)`, which reconstructs only the current branch's visible user-facing stream.
+
+`assertNotificationEntries(...)` should be removed as part of this refactor. If notification-level coverage is still needed, it should live in focused `TestSession` unit tests that verify raw notification capture behavior rather than through a retained public harness assertion.
 
 ## Merge algorithm
 
@@ -305,7 +307,7 @@ Add or update tests to cover:
 - migration of `src/manual.test.ts`
 - migration of `src/auto.test.ts`
 - compatibility coverage for `assumeCommandContext(...)` after its move into `test-session.ts`
-- legacy-compatibility coverage confirming `assertSessionContains(...)` still ignores notifications and only matches durable session-derived entries
+- legacy-compatibility coverage confirming `assertSessionContains(...)` still ignores notifications, searches whole-session durable entries via `sessionManager.getEntries()`, and does not regress non-current-branch lookups
 
 ## Recommendation
 
