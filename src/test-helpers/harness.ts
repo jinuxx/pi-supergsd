@@ -9,6 +9,7 @@ import {
   SessionManager,
   SettingsManager,
   type AgentSession,
+  type InputSource,
   type SessionEntry,
   type SessionMessageEntry,
 } from '@earendil-works/pi-coding-agent';
@@ -36,6 +37,13 @@ export class TestHarness {
 
   private cancelNextNav: boolean;
 
+  /**
+   * Reaction engine runs during `runAuto()` by hooking into the `/auto` command's
+   * `waitForIdle` callback. Reactions inject synthetic messages directly into the
+   * session manager — bypassing the faux provider — because the real `/auto` command
+   * manages its own LLM interaction. Response descriptors go through the faux
+   * provider only during `prompt()`, where the harness controls the model cycle.
+   */
   // Reaction engine state — set by runAuto, consumed by waitForIdle
   private activeReactions: NonNullable<AutoConfig['reactions']> | null = null;
   private activeSeenIds: Set<string> | null = null;
@@ -358,7 +366,7 @@ export class TestHarness {
 
   async prompt(text: string, ...responses: ResponseDescriptor[]): Promise<void> {
     this.fauxResponses.enqueue(...responses);
-    await this.session.prompt(text, { expandPromptTemplates: false, source: 'test' as never });
+    await this.session.prompt(text, { expandPromptTemplates: false, source: 'test' as InputSource });
     await this.session.agent.waitForIdle();
     this.assertNoQueuedResponses(`prompt(${JSON.stringify(text)})`);
   }
@@ -404,13 +412,13 @@ export class TestHarness {
       cancelNextNavigation: () => { this.cancelNextNav = true; },
       triggerShutdown: () => { this.triggerSessionShutdown().catch(() => {}); },
       runAutoAgain: () => {
-        this.session.prompt('/auto', { expandPromptTemplates: true, source: 'test' as never }).catch(() => {});
+        this.session.prompt('/auto', { expandPromptTemplates: true, source: 'test' as InputSource }).catch(() => {});
       },
     };
     this.activeRuntime = runtime;
 
     try {
-      await this.session.prompt('/auto', { expandPromptTemplates: true, source: 'test' as never });
+      await this.session.prompt('/auto', { expandPromptTemplates: true, source: 'test' as InputSource });
     } finally {
       this.activeReactions = null;
       this.activeSeenIds = null;

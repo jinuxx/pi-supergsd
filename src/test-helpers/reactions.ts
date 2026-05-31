@@ -2,11 +2,11 @@ import type { SessionEntry, SessionManager } from '@earendil-works/pi-coding-age
 
 import { extractTextContent } from '../text-content.js';
 
-import type { MatchDescriptor_, ReactionDescriptor, ResponseDescriptor } from './descriptors.js';
+import type { MatchDescriptor, ReactionDescriptor, ResponseDescriptor } from './descriptors.js';
 
 export function scanAndReact(
   sessionManager: SessionManager,
-  reactions: Array<[MatchDescriptor_, ReactionDescriptor | ResponseDescriptor | ResponseDescriptor[]]>,
+  reactions: Array<[MatchDescriptor, ReactionDescriptor | ResponseDescriptor | ResponseDescriptor[]]>,
   seenIds: Set<string>,
   runtime: ReactionRuntime,
 ): boolean {
@@ -39,7 +39,7 @@ export interface ReactionRuntime {
   runAutoAgain(): void;
 }
 
-function entryMatches(entry: SessionEntry, match: MatchDescriptor_): boolean {
+function entryMatches(entry: SessionEntry, match: MatchDescriptor): boolean {
   if (match.type === 'match:prompt') {
     if (entry.type !== 'message' || entry.message.role !== 'user') return false;
     return (extractTextContent(entry.message.content, '') ?? '').includes(match.text);

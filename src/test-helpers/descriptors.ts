@@ -1,7 +1,7 @@
 import type { ExtensionCommandContext } from '@earendil-works/pi-coding-agent';
 
 export interface AutoConfig {
-  reactions?: Array<[MatchDescriptor_, ReactionDescriptor | ResponseDescriptor | ResponseDescriptor[]]>;
+  reactions?: Array<[MatchDescriptor, ReactionDescriptor | ResponseDescriptor | ResponseDescriptor[]]>;
 }
 
 
@@ -14,7 +14,7 @@ export type NotificationEntry = {
   afterEntryId: string | null;
 };
 
-export type MatchDescriptor_ = PromptMatch | QueuedTaskMatch | UserEntry | AssistantEntry;
+export type MatchDescriptor = PromptMatch | QueuedTaskMatch | UserEntry | AssistantEntry;
 
 export type PromptMatch = { type: 'match:prompt'; text: string };
 
