@@ -33,12 +33,16 @@ export class FauxProvider {
   constructor(private readonly engine: ReactionEngine) {}
 
   stream = (_model: Model, context: Context): FauxEventStream => {
-    const lastUser = [...context.messages].reverse().find(message => message.role === 'user');
+    const lastUser = [...context.messages]
+      .reverse()
+      .find((message) => message.role === 'user');
     const promptText = lastUser ? readUserText(lastUser.content) : '';
     const responses = this.engine.matchPrompt(promptText);
 
     if (responses.length === 0) {
-      throw new Error(`No reaction engine rule matched provider prompt: ${promptText || '<empty prompt>'}`);
+      throw new Error(
+        `No reaction engine rule matched provider prompt: ${promptText || '<empty prompt>'}`,
+      );
     }
 
     const stream = new FauxEventStream();
@@ -57,7 +61,7 @@ export class FauxProvider {
  */
 export class FauxEventStream {
   constructor() {
-    this.resultPromise = new Promise<AssistantMessage>(resolve => {
+    this.resultPromise = new Promise<AssistantMessage>((resolve) => {
       this.resolveResult = resolve;
     });
   }
@@ -99,7 +103,7 @@ export class FauxEventStream {
       } else if (this.done) {
         break;
       } else {
-        yield await new Promise<AssistantMessageEvent>(resolve => {
+        yield await new Promise<AssistantMessageEvent>((resolve) => {
           this.waiting.push(resolve);
         });
       }
@@ -120,16 +124,54 @@ interface Context {
 type AssistantMessageEvent =
   | { type: 'start'; partial: AssistantMessage }
   | { type: 'text_start'; contentIndex: number; partial: AssistantMessage }
-  | { type: 'text_delta'; contentIndex: number; delta: string; partial: AssistantMessage }
-  | { type: 'text_end'; contentIndex: number; content: string; partial: AssistantMessage }
+  | {
+      type: 'text_delta';
+      contentIndex: number;
+      delta: string;
+      partial: AssistantMessage;
+    }
+  | {
+      type: 'text_end';
+      contentIndex: number;
+      content: string;
+      partial: AssistantMessage;
+    }
   | { type: 'thinking_start'; contentIndex: number; partial: AssistantMessage }
-  | { type: 'thinking_delta'; contentIndex: number; delta: string; partial: AssistantMessage }
-  | { type: 'thinking_end'; contentIndex: number; content: string; partial: AssistantMessage }
+  | {
+      type: 'thinking_delta';
+      contentIndex: number;
+      delta: string;
+      partial: AssistantMessage;
+    }
+  | {
+      type: 'thinking_end';
+      contentIndex: number;
+      content: string;
+      partial: AssistantMessage;
+    }
   | { type: 'toolcall_start'; contentIndex: number; partial: AssistantMessage }
-  | { type: 'toolcall_delta'; contentIndex: number; delta: string; partial: AssistantMessage }
-  | { type: 'toolcall_end'; contentIndex: number; toolCall: ToolCall; partial: AssistantMessage }
-  | { type: 'done'; reason: Extract<StopReason, 'stop' | 'length' | 'toolUse'>; message: AssistantMessage }
-  | { type: 'error'; reason: Extract<StopReason, 'aborted' | 'error'>; error: AssistantMessage };
+  | {
+      type: 'toolcall_delta';
+      contentIndex: number;
+      delta: string;
+      partial: AssistantMessage;
+    }
+  | {
+      type: 'toolcall_end';
+      contentIndex: number;
+      toolCall: ToolCall;
+      partial: AssistantMessage;
+    }
+  | {
+      type: 'done';
+      reason: Extract<StopReason, 'stop' | 'length' | 'toolUse'>;
+      message: AssistantMessage;
+    }
+  | {
+      type: 'error';
+      reason: Extract<StopReason, 'aborted' | 'error'>;
+      error: AssistantMessage;
+    };
 
 type StopReason = 'stop' | 'length' | 'toolUse' | 'error' | 'aborted';
 
@@ -142,7 +184,12 @@ interface Model {
   reasoning: boolean;
   thinkingLevelMap?: Record<string, string | null>;
   input: ('text' | 'image')[];
-  cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  cost: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+  };
   contextWindow: number;
   maxTokens: number;
 }
@@ -151,7 +198,7 @@ function readUserText(content: string | TextContent[]): string {
   if (typeof content === 'string') return content;
   return content
     .filter((block): block is TextContent => block.type === 'text')
-    .map(block => block.text)
+    .map((block) => block.text)
     .join('\n');
 }
 
@@ -193,28 +240,67 @@ function emitPromptResponses(
     throw new Error('aborts(...) must be the only descriptor in onPrompt(...)');
   });
 
-  const stopReason = content.some(block => block.type === 'toolCall') ? 'toolUse' : 'stop';
+  const stopReason = content.some((block) => block.type === 'toolCall')
+    ? 'toolUse'
+    : 'stop';
   const message = makeAssistantMessage(content, stopReason);
 
   stream.push({ type: 'start', partial: message });
 
   for (const [index, block] of content.entries()) {
     if (block.type === 'text') {
-      stream.push({ type: 'text_start', contentIndex: index, partial: message });
-      stream.push({ type: 'text_delta', contentIndex: index, delta: block.text, partial: message });
-      stream.push({ type: 'text_end', contentIndex: index, content: block.text, partial: message });
+      stream.push({
+        type: 'text_start',
+        contentIndex: index,
+        partial: message,
+      });
+      stream.push({
+        type: 'text_delta',
+        contentIndex: index,
+        delta: block.text,
+        partial: message,
+      });
+      stream.push({
+        type: 'text_end',
+        contentIndex: index,
+        content: block.text,
+        partial: message,
+      });
       continue;
     }
 
     if (block.type === 'thinking') {
-      stream.push({ type: 'thinking_start', contentIndex: index, partial: message });
-      stream.push({ type: 'thinking_delta', contentIndex: index, delta: block.thinking, partial: message });
-      stream.push({ type: 'thinking_end', contentIndex: index, content: block.thinking, partial: message });
+      stream.push({
+        type: 'thinking_start',
+        contentIndex: index,
+        partial: message,
+      });
+      stream.push({
+        type: 'thinking_delta',
+        contentIndex: index,
+        delta: block.thinking,
+        partial: message,
+      });
+      stream.push({
+        type: 'thinking_end',
+        contentIndex: index,
+        content: block.thinking,
+        partial: message,
+      });
       continue;
     }
 
-    stream.push({ type: 'toolcall_start', contentIndex: index, partial: message });
-    stream.push({ type: 'toolcall_end', contentIndex: index, toolCall: block, partial: message });
+    stream.push({
+      type: 'toolcall_start',
+      contentIndex: index,
+      partial: message,
+    });
+    stream.push({
+      type: 'toolcall_end',
+      contentIndex: index,
+      toolCall: block,
+      partial: message,
+    });
   }
 
   stream.push({ type: 'done', reason: stopReason, message });

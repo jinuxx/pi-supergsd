@@ -2,14 +2,9 @@ import assert from 'node:assert';
 
 import { describe, it } from 'node:test';
 
-import {
-  SessionManager,
-  type Theme,
-} from '@earendil-works/pi-coding-agent';
+import { SessionManager, type Theme } from '@earendil-works/pi-coding-agent';
 
-import {
-  cmdAuto,
-} from './index.js';
+import { cmdAuto } from './index.js';
 
 import {
   aborts,
@@ -30,7 +25,10 @@ describe('automated workflow', () => {
   it('completes push-task -> /auto -> finish-task and injects the branch result', async () => {
     const engine = new ReactionEngine();
     engine.onPrompt('main work', responds('working on main...'));
-    engine.onPrompt('Analyze performance.', responds('Found 3 bottlenecks: ...'));
+    engine.onPrompt(
+      'Analyze performance.',
+      responds('Found 3 bottlenecks: ...'),
+    );
     engine.onPrompt('Found 3 bottlenecks: ...', responds(''));
     const h = await TestHarness.create(engine);
     try {
@@ -40,7 +38,9 @@ describe('automated workflow', () => {
 
       await h.command('/auto');
 
-      h.assertTaskStatusHistoryIncludes('[auto] pending task: analyze-performance');
+      h.assertTaskStatusHistoryIncludes(
+        '[auto] pending task: analyze-performance',
+      );
       h.assertSessionContains(
         user('main work'),
         assistant('working on main...'),
@@ -125,7 +125,8 @@ describe('automated workflow', () => {
       sendUserMessage() {},
       sendMessage() {},
       on(eventName: string, handler: () => unknown) {
-        if (eventName === 'session_shutdown') sessionShutdownHandlers.push(handler);
+        if (eventName === 'session_shutdown')
+          sessionShutdownHandlers.push(handler);
       },
     } satisfies Parameters<typeof cmdAuto>[0];
 
@@ -230,7 +231,11 @@ describe('automated workflow', () => {
     const engine = new ReactionEngine();
     engine.onPrompt('main work', responds('working...'));
     engine.onPrompt('', responds(''));
-    engine.onPrompt('parent task', responds('working on parent...'), pushTask('subtask'));
+    engine.onPrompt(
+      'parent task',
+      responds('working on parent...'),
+      pushTask('subtask'),
+    );
     engine.onPrompt('subtask', responds('sub done'));
     engine.onPrompt('sub done', responds(''));
     engine.onPrompt('working on parent...', responds(''));
@@ -262,7 +267,10 @@ describe('automated workflow', () => {
     engine.onPrompt('start', responds(''));
     engine.onPrompt('', responds(''));
     engine.onPrompt('Quick fix.', responds('thinking...'));
-    engine.onAssistant('thinking...', { type: 'user-append', text: 'steer it' });
+    engine.onAssistant('thinking...', {
+      type: 'user-append',
+      text: 'steer it',
+    });
     engine.onPrompt('steer it', responds('adjusted response'));
     engine.onPrompt('adjusted response', responds(''));
     const h = await TestHarness.create(engine);

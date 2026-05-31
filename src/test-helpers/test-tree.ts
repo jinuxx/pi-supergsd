@@ -35,7 +35,7 @@ class TestNode {
     this.registered = true;
 
     const chain = [...ancestors, this];
-    const name = chain.map(node => node.name).join(' → ');
+    const name = chain.map((node) => node.name).join(' → ');
 
     it(name, async () => {
       const h = await TestHarness.create(new ReactionEngine());

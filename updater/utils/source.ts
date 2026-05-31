@@ -16,22 +16,36 @@ export async function superpowersUpdate(): Promise<void> {
   } catch {
     // Directory does not exist — clone fresh
     await execFileAsync('git', [
-      'clone', '--depth', '1', '--branch', REF,
-      `https://github.com/${REPO}.git`, dir,
+      'clone',
+      '--depth',
+      '1',
+      '--branch',
+      REF,
+      `https://github.com/${REPO}.git`,
+      dir,
     ]);
     return;
   }
 
   // Directory exists — try to update
   try {
-    await execFileAsync('git', ['fetch', '--depth', '1', 'origin', REF], { cwd: dir });
-    await execFileAsync('git', ['reset', '--hard', `origin/${REF}`], { cwd: dir });
+    await execFileAsync('git', ['fetch', '--depth', '1', 'origin', REF], {
+      cwd: dir,
+    });
+    await execFileAsync('git', ['reset', '--hard', `origin/${REF}`], {
+      cwd: dir,
+    });
   } catch {
     // Update failed — wipe and re-clone
     rmSync(dir, { recursive: true, force: true });
     await execFileAsync('git', [
-      'clone', '--depth', '1', '--branch', REF,
-      `https://github.com/${REPO}.git`, dir,
+      'clone',
+      '--depth',
+      '1',
+      '--branch',
+      REF,
+      `https://github.com/${REPO}.git`,
+      dir,
     ]);
   }
 }

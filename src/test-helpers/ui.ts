@@ -1,4 +1,7 @@
-import type { ExtensionUIContext, Theme } from '@earendil-works/pi-coding-agent';
+import type {
+  ExtensionUIContext,
+  Theme,
+} from '@earendil-works/pi-coding-agent';
 
 export class TestUI {
   private readonly notificationLog: TestNotification[] = [];

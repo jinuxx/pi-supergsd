@@ -32,10 +32,7 @@ describe('AgentSession-backed TestHarness foundation', () => {
     const h = await TestHarness.create(engine);
     try {
       await h.prompt('main work');
-      h.assertBranchHistory(
-        user('main work'),
-        assistant('working...'),
-      );
+      h.assertBranchHistory(user('main work'), assistant('working...'));
     } finally {
       h.dispose();
     }
@@ -63,10 +60,7 @@ describe('AgentSession-backed TestHarness foundation', () => {
     const h = await TestHarness.create(engine);
     try {
       await h.prompt('think');
-      h.assertBranchHistory(
-        user('think'),
-        assistant(''),
-      );
+      h.assertBranchHistory(user('think'), assistant(''));
 
       await h.prompt('stop');
       h.assertSessionContains(
@@ -84,11 +78,10 @@ describe('AgentSession-backed TestHarness foundation', () => {
     const h = await TestHarness.create(engine);
     try {
       await h.prompt('delegate work');
-      h.assertSessionContains(
-        user('delegate work'),
-        task('subtask', true),
+      h.assertSessionContains(user('delegate work'), task('subtask', true));
+      h.assertNotifications(
+        'Task stored. Use `/start-task` or `/auto` to start it.',
       );
-      h.assertNotifications('Task stored. Use `/start-task` or `/auto` to start it.');
     } finally {
       h.dispose();
     }
@@ -97,14 +90,19 @@ describe('AgentSession-backed TestHarness foundation', () => {
   it('runs /auto with a prompt reaction and attaches the branch result', async () => {
     const engine = new ReactionEngine();
     engine.onPrompt('main work', responds('working...'));
-    engine.onPrompt('Analyze performance.', responds('Found 3 bottlenecks: ...'));
+    engine.onPrompt(
+      'Analyze performance.',
+      responds('Found 3 bottlenecks: ...'),
+    );
     engine.onPrompt('Found 3 bottlenecks: ...', responds(''));
     const h = await TestHarness.create(engine);
     try {
       await h.prompt('main work');
       await h.pushTask('Analyze performance.');
       await h.command('/auto');
-      h.assertSessionContains(taskResult('analyze-performance', 'Found 3 bottlenecks: ...'));
+      h.assertSessionContains(
+        taskResult('analyze-performance', 'Found 3 bottlenecks: ...'),
+      );
     } finally {
       h.dispose();
     }
@@ -113,7 +111,9 @@ describe('AgentSession-backed TestHarness foundation', () => {
   it('cancels navigation before sending a queued task prompt', async () => {
     const engine = new ReactionEngine();
     engine.onPrompt('main work', responds('working...'));
-    engine.onQueuedTask('Cancel before navigation.', false, { type: 'user-esc' });
+    engine.onQueuedTask('Cancel before navigation.', false, {
+      type: 'user-esc',
+    });
     const h = await TestHarness.create(engine);
     try {
       await h.prompt('main work');
@@ -132,10 +132,7 @@ describe('AgentSession-backed TestHarness foundation', () => {
     const h = await TestHarness.create(engine);
     try {
       await h.prompt('main work');
-      h.assertBranchHistory(
-        user('main work'),
-        assistant('working...'),
-      );
+      h.assertBranchHistory(user('main work'), assistant('working...'));
     } finally {
       h.dispose();
     }
@@ -242,7 +239,10 @@ describe('AgentSession-backed TestHarness foundation', () => {
   it('uses assistant and queued-task rules during /auto', async () => {
     const engine = new ReactionEngine();
     engine.onPrompt('main work', responds('working...'));
-    engine.onPrompt('Analyze performance.', responds('Found 3 bottlenecks: ...'));
+    engine.onPrompt(
+      'Analyze performance.',
+      responds('Found 3 bottlenecks: ...'),
+    );
     engine.onPrompt('Found 3 bottlenecks: ...', responds(''));
 
     const h = await TestHarness.create(engine);
@@ -250,7 +250,9 @@ describe('AgentSession-backed TestHarness foundation', () => {
       await h.prompt('main work');
       await h.pushTask('Analyze performance.');
       await h.command('/auto');
-      h.assertSessionContains(taskResult('analyze-performance', 'Found 3 bottlenecks: ...'));
+      h.assertSessionContains(
+        taskResult('analyze-performance', 'Found 3 bottlenecks: ...'),
+      );
     } finally {
       h.dispose();
     }
@@ -260,7 +262,11 @@ describe('AgentSession-backed TestHarness foundation', () => {
     const engine = new ReactionEngine();
     engine.onPrompt('main work', responds('working...'));
     engine.onPrompt('', responds(''));
-    engine.onPrompt('parent task', responds('working on parent...'), pushTask('subtask'));
+    engine.onPrompt(
+      'parent task',
+      responds('working on parent...'),
+      pushTask('subtask'),
+    );
     engine.onPrompt('subtask', responds('sub done'));
     engine.onPrompt('sub done', responds(''));
     engine.onPrompt('working on parent...', responds(''));

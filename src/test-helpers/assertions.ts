@@ -1,6 +1,9 @@
 import assert from 'node:assert';
 
-import type { SessionEntry, SessionManager } from '@earendil-works/pi-coding-agent';
+import type {
+  SessionEntry,
+  SessionManager,
+} from '@earendil-works/pi-coding-agent';
 
 import { extractTextContent } from '../text-content.js';
 import type { BranchEntry } from './descriptors.js';
@@ -9,7 +12,8 @@ export function assertBranchHistory(
   sessionManager: SessionManager,
   expected: BranchEntry[],
 ): void {
-  const actual = sessionManager.getBranch()
+  const actual = sessionManager
+    .getBranch()
     .map(stripVisibleEntry)
     .filter((entry): entry is BranchEntry => entry !== null);
 
@@ -20,13 +24,14 @@ export function assertSessionContains(
   sessionManager: SessionManager,
   expected: BranchEntry[],
 ): void {
-  const actual = sessionManager.getEntries()
+  const actual = sessionManager
+    .getEntries()
     .map(stripVisibleEntry)
     .filter((entry): entry is BranchEntry => entry !== null);
 
   for (const expectedEntry of expected) {
     assert.ok(
-      actual.some(entry => entriesEqual(entry, expectedEntry)),
+      actual.some((entry) => entriesEqual(entry, expectedEntry)),
       `Expected session to contain entry: ${JSON.stringify(expectedEntry)}`,
     );
   }
@@ -39,7 +44,15 @@ function stripVisibleEntry(entry: SessionEntry): BranchEntry | null {
     if (entry.message.role === 'user') {
       return {
         type: 'message',
-        message: { role: 'user', content: [{ type: 'text', text: extractTextContent(entry.message.content, '') ?? '' }] },
+        message: {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: extractTextContent(entry.message.content, '') ?? '',
+            },
+          ],
+        },
       };
     }
 
@@ -48,7 +61,12 @@ function stripVisibleEntry(entry: SessionEntry): BranchEntry | null {
         type: 'message',
         message: {
           role: 'assistant',
-          content: [{ type: 'text', text: extractTextContent(entry.message.content, '') ?? '' }],
+          content: [
+            {
+              type: 'text',
+              text: extractTextContent(entry.message.content, '') ?? '',
+            },
+          ],
           ...(entry.message.stopReason && entry.message.stopReason !== 'stop'
             ? { stopReason: entry.message.stopReason }
             : {}),
@@ -89,20 +107,30 @@ function isHiddenEntry(entry: SessionEntry): boolean {
     case 'label':
       return true;
     case 'custom':
-      return entry.customType === 'task-done' || entry.customType === 'task-start';
+      return (
+        entry.customType === 'task-done' || entry.customType === 'task-start'
+      );
     default:
       return false;
   }
 }
 
-function readTaskData(data: unknown): { prompt: string; inherit_context: boolean } | null {
+function readTaskData(
+  data: unknown,
+): { prompt: string; inherit_context: boolean } | null {
   if (!isRecord(data)) return null;
-  if (typeof data.prompt !== 'string' || typeof data.inherit_context !== 'boolean') return null;
+  if (
+    typeof data.prompt !== 'string' ||
+    typeof data.inherit_context !== 'boolean'
+  )
+    return null;
   return { prompt: data.prompt, inherit_context: data.inherit_context };
 }
 
 function readTaskResultSlug(details: unknown): string | null {
-  return isRecord(details) && typeof details.slug === 'string' ? details.slug : null;
+  return isRecord(details) && typeof details.slug === 'string'
+    ? details.slug
+    : null;
 }
 
 function entriesEqual(actual: BranchEntry, expected: BranchEntry): boolean {

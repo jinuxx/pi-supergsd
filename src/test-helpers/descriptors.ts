@@ -4,9 +4,13 @@ export type ControlReactionDescriptor =
   | { type: 'user-esc' }
   | { type: 'user-ctrl-c' }
   | { type: 'user-runs-auto' }
-  | { type: 'user-append'; text: string };  // Append a user message as a reaction
+  | { type: 'user-append'; text: string }; // Append a user message as a reaction
 
-export type ResponseDescriptor = RespondsDescriptor | ThinksDescriptor | AbortsDescriptor | PushTaskDescriptor;
+export type ResponseDescriptor =
+  | RespondsDescriptor
+  | ThinksDescriptor
+  | AbortsDescriptor
+  | PushTaskDescriptor;
 
 export type RespondsDescriptor = { type: 'response:text'; text: string };
 
@@ -20,7 +24,12 @@ export type PushTaskDescriptor = {
   inherit_context: boolean;
 };
 
-export type BranchEntry = UserEntry | AssistantEntry | TaskEntry | TaskResultEntry | NotificationEntry;
+export type BranchEntry =
+  | UserEntry
+  | AssistantEntry
+  | TaskEntry
+  | TaskResultEntry
+  | NotificationEntry;
 
 export type NotificationEntry = {
   type: 'notification';
@@ -97,7 +106,9 @@ const taskResult = (slug: string, content?: string): TaskResultEntry => ({
   type: 'custom_message',
   customType: 'task-result',
   details: { slug },
-  ...(content !== undefined ? { content: [{ type: 'text', text: content }] } : {}),
+  ...(content !== undefined
+    ? { content: [{ type: 'text', text: content }] }
+    : {}),
 });
 
 type TaskResultEntry = {
@@ -114,13 +125,25 @@ type TextBlock = {
   text: string;
 };
 
-const responds = (text: string): RespondsDescriptor => ({ type: 'response:text', text });
+const responds = (text: string): RespondsDescriptor => ({
+  type: 'response:text',
+  text,
+});
 
-const thinks = (text: string): ThinksDescriptor => ({ type: 'response:thinking', text });
+const thinks = (text: string): ThinksDescriptor => ({
+  type: 'response:thinking',
+  text,
+});
 
-const aborts = (text: string): AbortsDescriptor => ({ type: 'response:aborted', text });
+const aborts = (text: string): AbortsDescriptor => ({
+  type: 'response:aborted',
+  text,
+});
 
-const pushTask = (prompt_: string, inherit_context = false): PushTaskDescriptor => ({
+const pushTask = (
+  prompt_: string,
+  inherit_context = false,
+): PushTaskDescriptor => ({
   type: 'response:push-task',
   prompt: prompt_,
   inherit_context,
@@ -130,7 +153,9 @@ const userEsc = (): { type: 'user-esc' } => ({ type: 'user-esc' });
 
 const userCtrlC = (): { type: 'user-ctrl-c' } => ({ type: 'user-ctrl-c' });
 
-const userRunsAuto = (): { type: 'user-runs-auto' } => ({ type: 'user-runs-auto' });
+const userRunsAuto = (): { type: 'user-runs-auto' } => ({
+  type: 'user-runs-auto',
+});
 
 const notification = (text: string): NotificationEntry => ({
   type: 'notification',
@@ -138,6 +163,8 @@ const notification = (text: string): NotificationEntry => ({
   afterEntryId: null,
 });
 
-function assumeCommandContext<T extends object>(value: T): ExtensionCommandContext & T {
+function assumeCommandContext<T extends object>(
+  value: T,
+): ExtensionCommandContext & T {
   return value as unknown as ExtensionCommandContext & T;
 }

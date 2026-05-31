@@ -28,15 +28,19 @@ export class ReactionEngine {
   }
 
   matchPrompt(text: string): ResponseDescriptor[] {
-    const matched = this.promptRules.find(rule => {
+    const matched = this.promptRules.find((rule) => {
       if (rule.text === '') return text === '';
       return text.includes(rule.text);
     });
     return matched ? [...matched.responses] : [];
   }
 
-  matchAssistant(text: string): Array<ResponseDescriptor | ControlReactionDescriptor> {
-    const matched = this.assistantRules.find(rule => text.includes(rule.text));
+  matchAssistant(
+    text: string,
+  ): Array<ResponseDescriptor | ControlReactionDescriptor> {
+    const matched = this.assistantRules.find((rule) =>
+      text.includes(rule.text),
+    );
     return matched ? [...matched.reactions] : [];
   }
 
@@ -44,9 +48,12 @@ export class ReactionEngine {
     prompt: string,
     inheritContext: boolean,
   ): Array<ResponseDescriptor | ControlReactionDescriptor> {
-    const matched = this.queuedTaskRules.find(rule => {
+    const matched = this.queuedTaskRules.find((rule) => {
       if (!prompt.includes(rule.prompt)) return false;
-      return rule.inheritContext === undefined || rule.inheritContext === inheritContext;
+      return (
+        rule.inheritContext === undefined ||
+        rule.inheritContext === inheritContext
+      );
     });
     return matched ? [...matched.reactions] : [];
   }

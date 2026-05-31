@@ -3,7 +3,6 @@ import assert from 'node:assert';
 import { applyPatches } from './index.js';
 import type { Patch } from './index.js';
 
-
 describe('applyPatches', () => {
   it('returns unmatched patches when find string is missing', () => {
     const patch = { op: 'replace' as const, find: 'xyz', replace: 'abc' };
@@ -52,7 +51,11 @@ describe('applyPatches', () => {
   });
 
   it('returns unmatched delete-block when start missing', () => {
-    const patch = { op: 'delete-block' as const, findStart: 'missing', findEnd: 'end' };
+    const patch = {
+      op: 'delete-block' as const,
+      findStart: 'missing',
+      findEnd: 'end',
+    };
     const result = applyPatches('a\nb\nc', [patch]);
     assert.strictEqual(result.result, 'a\nb\nc');
     assert.deepStrictEqual(result.unmatched, [patch]);
@@ -81,7 +84,9 @@ describe('applyPatches', () => {
 
   it('throws on invalid patch operation', () => {
     assert.throws(() => {
-      applyPatches('test', [{ op: 'invalid', find: 'x', replace: 'y' } as unknown as Patch]);
+      applyPatches('test', [
+        { op: 'invalid', find: 'x', replace: 'y' } as unknown as Patch,
+      ]);
     }, /Invalid patch operation/);
   });
 });
