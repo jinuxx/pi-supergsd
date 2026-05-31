@@ -10,6 +10,7 @@ import {
   aborts,
   assistant,
   assumeCommandContext,
+  notification,
   responds,
   pushTask,
   task,
@@ -30,6 +31,7 @@ describe("automated workflow", () => {
       responds("Found 3 bottlenecks: ..."),
     );
     h.llm.onPrompt("Found 3 bottlenecks: ...", responds(""));
+    h.llm.onPrompt("working on main...", responds(""));
     h.llm.onPrompt("queue analyze", pushTask("Analyze performance."));
     try {
       await h.prompt("main work");
@@ -41,15 +43,19 @@ describe("automated workflow", () => {
       h.assertTaskStatusHistoryIncludes(
         "[auto] pending task: analyze-performance",
       );
-      h.assertSessionContains(
+      h.assertSession(
         user("main work"),
         assistant("working on main..."),
         user("queue analyze"),
         assistant("", "toolUse"),
         task("Analyze performance."),
+        notification(
+          "Task stored. Use `/start-task` or `/auto` to start it.",
+        ),
+        notification("Task finished. Last response attached."),
         taskResult("analyze-performance", "Found 3 bottlenecks: ..."),
+        assistant(""),
       );
-      h.assertNotifications("Task finished. Last response attached.");
       assert.strictEqual(h.getStatus(), undefined);
     } finally {
       h.dispose();
@@ -70,15 +76,19 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSessionContains(
+      h.assertSession(
         user("main work"),
         assistant("working..."),
         user("queue quick-fix"),
         assistant("", "toolUse"),
         task("Quick fix.", true),
+        notification(
+          "Task stored. Use `/start-task` or `/auto` to start it.",
+        ),
+        notification("Task finished. Last response attached."),
         taskResult("quick-fix", "Fixed the bug."),
+        assistant(""),
       );
-      h.assertNotifications("Task finished. Last response attached.");
     } finally {
       h.dispose();
     }
@@ -95,12 +105,15 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSessionContains(
+      h.assertSession(
         user("main work"),
         assistant(""),
         user("queue analyze"),
         assistant("", "toolUse"),
         task("Analyze performance."),
+        notification(
+          "Task stored. Use `/start-task` or `/auto` to start it.",
+        ),
       );
     } finally {
       h.dispose();
@@ -111,7 +124,7 @@ describe("automated workflow", () => {
     const h = await TestHarness.create();
     try {
       await h.prompt("/auto");
-      h.assertNotifications("No pending tasks to run.");
+      h.assertSession(notification("No pending tasks to run."));
     } finally {
       h.dispose();
     }
@@ -194,14 +207,18 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertNotifications("Auto is already running.");
-      h.assertSessionContains(
+      h.assertSession(
         user("start"),
         assistant(""),
         user("queue first"),
         assistant("", "toolUse"),
         task("first task"),
+        notification(
+          "Task stored. Use `/start-task` or `/auto` to start it.",
+        ),
+        notification("Task finished. Last response attached."),
         taskResult("first-task", "done"),
+        assistant(""),
       );
       assert.strictEqual(h.getStatus(), undefined);
     } finally {
@@ -221,12 +238,15 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSessionContains(
+      h.assertSession(
         user("start"),
         assistant(""),
         user("queue implement"),
         assistant("", "toolUse"),
         task("Implement phase 1.", true),
+        notification(
+          "Task stored. Use `/start-task` or `/auto` to start it.",
+        ),
         user("Implement phase 1."),
         assistant("Stopped by user.", "aborted"),
       );
@@ -255,19 +275,26 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSessionContains(
-        user("subtask"),
-        assistant("sub done"),
-        taskResult("subtask", "sub done"),
-      );
-      h.assertSessionContains(
+      // Current branch shows the parent task result
+      h.assertSession(
         user("main work"),
         assistant("working..."),
         user("queue parent"),
         assistant("", "toolUse"),
         task("parent task"),
+        notification(
+          "Task stored. Use `/start-task` or `/auto` to start it.",
+        ),
+        notification("Task finished. Last response attached."),
+        taskResult("parent-task"),
+        assistant(""),
       );
-      h.assertNotifications("Task finished. Last response attached.");
+      // The subtask entries should be in the whole-session history
+      h.assertSessionContains(
+        user("subtask"),
+        assistant("sub done"),
+        taskResult("subtask", "sub done"),
+      );
     } finally {
       h.dispose();
     }
@@ -288,15 +315,19 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSessionContains(
+      h.assertSession(
         user("start"),
         assistant(""),
         user("queue quick-fix"),
         assistant("", "toolUse"),
         task("Quick fix.", true),
+        notification(
+          "Task stored. Use `/start-task` or `/auto` to start it.",
+        ),
+        notification("Task finished. Last response attached."),
         taskResult("quick-fix", "adjusted response"),
+        assistant(""),
       );
-      h.assertNotifications("Task finished. Last response attached.");
     } finally {
       h.dispose();
     }
@@ -315,12 +346,15 @@ describe("automated workflow", () => {
 
       await h.prompt("/auto");
 
-      h.assertSessionContains(
+      h.assertSession(
         user("start"),
         assistant(""),
         user("queue shutdown"),
         assistant("", "toolUse"),
         task("Shutdown task", true),
+        notification(
+          "Task stored. Use `/start-task` or `/auto` to start it.",
+        ),
         user("Shutdown task"),
         assistant("working..."),
       );
