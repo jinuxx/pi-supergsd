@@ -1,10 +1,11 @@
 export {
   assistant,
   assumeCommandContext,
+  notification,
   task,
   taskResult,
   user,
-} from "./descriptors.js";
+} from "./test-session.js";
 
 export { MockLLM, aborts, pushTask, responds, thinks } from "./mock-llm.js";
 
