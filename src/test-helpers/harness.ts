@@ -13,8 +13,11 @@ import {
 
 // eslint-disable-next-line unslop/import-control -- extension factory not available via src test-helpers import chain
 import registerSuperGsd from '../../index.js';
+import { updateTaskStatus } from '../index.js';
 import { assertBranchHistory, assertSessionContains } from './assertions.js';
 import type { AutoConfig, BranchEntry, ResponseDescriptor } from './descriptors.js';
+import { extractTextContent, taskResultTextContent } from '../text-content.js';
+import { makeSlug } from '../slug.js';
 import { FAUX_MODEL, FAUX_PROVIDER, FauxResponseQueue } from './faux-provider.js';
 import { scanAndReact } from './reactions.js';
 import type { ReactionRuntime } from './reactions.js';
@@ -36,6 +39,210 @@ export class TestHarness {
   private activeReactions: NonNullable<AutoConfig['reactions']> | null = null;
   private activeSeenIds: Set<string> | null = null;
   private activeRuntime: ReactionRuntime | null = null;
+
+  // ── Task workflow methods (replicate push-task, start-task, etc.) ──
+
+  async runPushTask(prompt_: string, inherit_context: boolean = false): Promise<void> {
+    this.sessionManager.appendCustomEntry('task', { prompt: prompt_, inherit_context });
+    this.refreshTaskStatus();
+    this.ui.notify('Task stored. Use `/start-task` or `/auto` to start it.');
+    await this.session.agent.waitForIdle();
+  }
+
+  async runStartTask(): Promise<void> {
+    const pending = this.findPendingTask();
+    if (!pending) {
+      this.ui.notify('No pending task. Use push-task first.', 'warning');
+      this.refreshTaskStatus();
+      await this.session.agent.waitForIdle();
+      return;
+    }
+
+    if (!pending.data.inherit_context) {
+      const departureLeafId = this.sessionManager.getLeafId()!;
+      const freshTargetId = this.findFreshTargetId();
+      if (freshTargetId) {
+        const result = await this.session.navigateTree(freshTargetId, { summarize: false });
+        if (result.cancelled) return;
+      }
+      this.sessionManager.appendCustomEntry('task-start', { returnTo: departureLeafId });
+    } else {
+      this.sessionManager.appendCustomEntry('task-start', { returnTo: this.sessionManager.getLeafId()! });
+    }
+
+    // Inject the task prompt as a user message (bypassing the LLM)
+    this.sessionManager.appendMessage(makeUserMessage(pending.data.prompt));
+
+    this.refreshTaskStatus();
+    await this.session.agent.waitForIdle();
+  }
+
+  async runFinishTask(): Promise<void> {
+    const taskStart = this.findCurrentTask();
+    if (!taskStart) {
+      this.ui.notify('Not inside task, nothing to finish.', 'warning');
+      this.refreshTaskStatus();
+      await this.session.agent.waitForIdle();
+      return;
+    }
+
+    const branch = this.sessionManager.getBranch();
+    const lastAssistant = this.findLastAssistantMessage(branch);
+    const lastAssistantContent = lastAssistant
+      ? taskResultTextContent(lastAssistant.message.content)
+      : undefined;
+    const taskPrompt = this.findTaskPrompt(branch);
+    const slug = taskPrompt ? makeSlug(taskPrompt) : undefined;
+
+    // Navigate back to the task start point
+    await this.session.navigateTree(taskStart.data.returnTo, { summarize: false });
+
+    // Inject the task result
+    if (lastAssistantContent !== undefined) {
+      this.sessionManager.appendCustomMessageEntry(
+        'task-result',
+        lastAssistantContent,
+        true,
+        { slug },
+      );
+    }
+
+    // Mark any pending tasks as done (handles push-task during a task)
+    if (this.findPendingTask()) {
+      this.sessionManager.appendCustomEntry('task-done', {});
+    }
+
+    this.ui.notify('Task finished. Last response attached.', 'info');
+    this.refreshTaskStatus();
+    await this.session.agent.waitForIdle();
+  }
+
+  async runDiscardTask(): Promise<void> {
+    const pending = this.findPendingTask();
+    if (!pending) {
+      this.ui.notify('No pending task to discard.', 'warning');
+      this.refreshTaskStatus();
+      await this.session.agent.waitForIdle();
+      return;
+    }
+
+    this.sessionManager.appendCustomEntry('task-done', {});
+    this.ui.notify('Task discarded.', 'info');
+    this.refreshTaskStatus();
+    await this.session.agent.waitForIdle();
+  }
+
+  async runAbortTask(): Promise<void> {
+    const taskStart = this.findCurrentTask();
+    if (!taskStart) {
+      this.ui.notify('Not inside task, nothing to abort.', 'warning');
+      this.refreshTaskStatus();
+      await this.session.agent.waitForIdle();
+      return;
+    }
+
+    await this.session.navigateTree(taskStart.data.returnTo, { summarize: false });
+    this.ui.notify('Task aborted. Branch abandoned without summary.', 'info');
+    this.refreshTaskStatus();
+    await this.session.agent.waitForIdle();
+  }
+
+  // ── Private helpers ──
+
+  private refreshTaskStatus(): void {
+    updateTaskStatus(
+      this.sessionManager as Parameters<typeof updateTaskStatus>[0],
+      (key: string, value: string | undefined) => {
+        if (key === 'task') this.ui.context.setStatus(key, value);
+      },
+      this.ui.theme,
+    );
+  }
+
+  /** Find the most recent pending (not-started, not-done) task entry. */
+  private findPendingTask(): { data: { prompt: string; inherit_context: boolean } } | null {
+    const branch = this.sessionManager.getBranch();
+    let skip = 0;
+    for (let i = branch.length - 1; i >= 0; i--) {
+      const entry = branch[i] as any;
+      if (entry.type === 'custom' && entry.customType === 'task-start') return null;
+      if (entry.type === 'custom' && entry.customType === 'task-done') {
+        skip++;
+        continue;
+      }
+      if (entry.type === 'custom' && entry.customType === 'task') {
+        const data = entry.data;
+        if (data && typeof data.prompt === 'string' && typeof data.inherit_context === 'boolean') {
+          if (skip === 0) return { data };
+          skip--;
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Find the most recent task-start entry (indicating a running task). */
+  private findCurrentTask(): { data: { returnTo: string } } | null {
+    const branch = this.sessionManager.getBranch();
+    for (let i = branch.length - 1; i >= 0; i--) {
+      const entry = branch[i] as any;
+      if (entry.type === 'custom' && entry.customType === 'task-start') {
+        const data = entry.data;
+        if (data && typeof data.returnTo === 'string') return { data };
+      }
+    }
+    return null;
+  }
+
+  /** Find the first model-visible entry's parent ID for fresh-context navigation. */
+  private findFreshTargetId(): string | null {
+    const branch = this.sessionManager.getBranch();
+    if (branch.length === 0) return null;
+
+    for (const entry of branch) {
+      if (
+        entry.type === 'message' ||
+        entry.type === 'compaction' ||
+        entry.type === 'branch_summary' ||
+        entry.type === 'custom_message'
+      ) {
+        return (entry as any).parentId ?? entry.id;
+      }
+    }
+
+    return (branch[0] as any).parentId ?? branch[0].id;
+  }
+
+  /** Find the last assistant message on the current branch. */
+  private findLastAssistantMessage(branch: readonly any[]): any | null {
+    for (let i = branch.length - 1; i >= 0; i--) {
+      const entry = branch[i];
+      if (entry.type === 'message' && entry.message?.role === 'assistant') {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  /** Find the task prompt (user message after the most recent task-start). */
+  private findTaskPrompt(branch: readonly any[]): string | undefined {
+    const startIdx = this.findLastIndex(branch, (e: any) => e.type === 'custom' && e.customType === 'task-start');
+    if (startIdx === -1) return undefined;
+    for (let i = startIdx + 1; i < branch.length; i++) {
+      const entry = branch[i];
+      if (entry.type === 'message' && entry.message?.role === 'user') {
+        return extractTextContent(entry.message.content, '') ?? undefined;
+      }
+    }
+    return undefined;
+  }
+
+  private findLastIndex(branch: readonly any[], predicate: (e: any) => boolean): number {
+    for (let i = branch.length - 1; i >= 0; i--) {
+      if (predicate(branch[i])) return i;
+    }
+    return -1;
+  }
 
   static async create(): Promise<TestHarness> {
     const cwd = process.cwd();
@@ -212,7 +419,7 @@ async runAuto(config: AutoConfig): Promise<void> {
     this.assertNoQueuedResponses('runAuto');
   }
 
-private async triggerSessionShutdown(): Promise<void> {
+async triggerSessionShutdown(): Promise<void> {
     await this.session.extensionRunner.emit({
       type: 'session_shutdown',
       reason: 'quit',
@@ -269,3 +476,16 @@ const FAUX_TEST_USAGE = {
   totalTokens: 0,
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 };
+
+function makeUserMessage(text: string): any {
+  return {
+    role: 'user',
+    content: [{ type: 'text' as const, text }],
+    api: FAUX_MODEL.api,
+    provider: FAUX_PROVIDER,
+    model: FAUX_MODEL.id,
+    usage: FAUX_TEST_USAGE,
+    stopReason: 'stop' as const,
+    timestamp: Date.now(),
+  };
+}

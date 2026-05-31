@@ -1,12 +1,12 @@
 import { it } from 'node:test';
 
-import { LegacyTestHarness } from './legacy-harness.js';
+import { TestHarness } from './harness.js';
 
 export function node(name: string, fn: NodeFn) {
   return new TestNode(name, fn);
 }
 
-type NodeFn = (h: LegacyTestHarness) => Promise<void> | void;
+type NodeFn = (h: TestHarness) => Promise<void> | void;
 
 class TestNode {
   constructor(
@@ -37,10 +37,13 @@ class TestNode {
     const name = chain.map(node => node.name).join(' → ');
 
     it(name, async () => {
-      const h = new LegacyTestHarness();
-
-      for (const node of chain) {
-        await node.fn?.(h);
+      const h = await TestHarness.create();
+      try {
+        for (const node of chain) {
+          await node.fn?.(h);
+        }
+      } finally {
+        h.dispose();
       }
     });
 

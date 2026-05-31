@@ -29,7 +29,8 @@ export type ReactionDescriptor = ControlReactionDescriptor | ResponseDescriptor 
 export type ControlReactionDescriptor =
   | { type: 'user-esc' }
   | { type: 'user-ctrl-c' }
-  | { type: 'user-runs-auto' };
+  | { type: 'user-runs-auto' }
+  | { type: 'user-append'; text: string };  // Append a user message as a reaction
 
 export type ResponseDescriptor = RespondsDescriptor | ThinksDescriptor | AbortsDescriptor | PushTaskDescriptor;
 

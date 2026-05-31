@@ -89,6 +89,9 @@ function applyReaction(
       case 'user-runs-auto':
         runtime.runAutoAgain();
         break;
+      case 'user-append':
+        runtime.appendUserMessage(item.text);
+        break;
       case 'response:text':
         runtime.appendAssistantMessage(item.text);
         break;

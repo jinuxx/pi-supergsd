@@ -23,6 +23,16 @@ export class TestUI {
     theme: this.theme,
   } as ExtensionUIContext;
 
+  notify(message: string, level?: 'error' | 'warning' | 'info'): void {
+    this.context.notify(message, level);
+  }
+
+  setStatus(key: string, value: string | undefined): void {
+    if (key === 'task') {
+      (this.context as any).setStatus(key, value);
+    }
+  }
+
   getStatus(): string | undefined {
     return this.taskStatus;
   }
