@@ -17,7 +17,7 @@ import {
 import registerSuperGsd from "../../index.js";
 import { isDeepStrictEqual } from "node:util";
 import { extractTextContent } from "../text-content.js";
-import { assistant, task, taskResult, user, type BranchEntry } from "./descriptors.js";
+import { visibleEntries, type BranchEntry } from "./descriptors.js";
 import { FAUX_MODEL, FAUX_PROVIDER, FauxProvider } from "./faux-provider.js";
 import { MockLLM } from "./mock-llm.js";
 import { MockUser, type MockUserAction } from "./mock-user.js";
@@ -122,7 +122,10 @@ export class TestHarness {
   }
 
   assertBranchHistory(...expected: BranchEntry[]): void {
-    assert.deepStrictEqual(visibleEntries(this.sessionManager.getBranch()), expected);
+    assert.deepStrictEqual(
+      visibleEntries(this.sessionManager.getBranch()),
+      expected,
+    );
   }
 
   assertSessionContains(...expected: BranchEntry[]): void {
@@ -279,71 +282,6 @@ export class TestHarness {
       );
     }
   }
-}
-
-function visibleEntries(entries: SessionEntry[]): BranchEntry[] {
-  return entries
-    .map(toBranchEntry)
-    .filter((entry): entry is BranchEntry => entry !== null);
-}
-
-function toBranchEntry(entry: SessionEntry): BranchEntry | null {
-  switch (entry.type) {
-    case "thinking_level_change":
-    case "model_change":
-    case "session_info":
-    case "label":
-      return null;
-    case "message":
-      if (entry.message.role === "user") {
-        return user(textContent(entry.message.content));
-      }
-      if (entry.message.role === "assistant") {
-        return assistant(
-          textContent(entry.message.content),
-          visibleStopReason(entry.message.stopReason),
-        );
-      }
-      return null;
-    case "custom":
-      return entry.customType === "task" && isTaskData(entry.data)
-        ? task(entry.data.prompt, entry.data.inherit_context)
-        : null;
-    case "custom_message":
-      if (entry.customType !== "task-result" || !hasSlug(entry.details)) {
-        return null;
-      }
-      return taskResult(
-        entry.details.slug,
-        textContent(entry.content) || undefined,
-      );
-    default:
-      return null;
-  }
-}
-
-function textContent(content: unknown): string {
-  return extractTextContent(content, "") ?? "";
-}
-
-function visibleStopReason(stopReason: unknown): string | undefined {
-  return typeof stopReason === "string" && stopReason !== "stop"
-    ? stopReason
-    : undefined;
-}
-
-function isTaskData(
-  value: unknown,
-): value is { prompt: string; inherit_context: boolean } {
-  return (
-    isRecord(value) &&
-    typeof value.prompt === "string" &&
-    typeof value.inherit_context === "boolean"
-  );
-}
-
-function hasSlug(value: unknown): value is { slug: string } {
-  return isRecord(value) && typeof value.slug === "string";
 }
 
 function isTaskEntryData(entry: SessionEntry): entry is SessionEntry & {
