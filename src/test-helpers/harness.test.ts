@@ -129,7 +129,6 @@ describe("AgentSession-backed TestHarness foundation", () => {
 
     await h.prompt("main work");
     await h.waitForIdle();
-    await h.waitForIdle();
 
     h.assertSessionContains(
       user("main work"),
