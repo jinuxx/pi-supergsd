@@ -102,8 +102,6 @@ describe("manual workflow", () => {
               user("main work"),
               assistant("working...", "toolUse"),
               task("Task AAA"),
-              notification("Task stored. Use `/start-task` or `/auto` to start it."),
-              notification("Task finished. Last response attached."),
               taskResult("task-aaa", "Done."),
               assistant("Great!"),
               notification("Not inside task, nothing to abort."),
@@ -117,7 +115,6 @@ describe("manual workflow", () => {
             user("main work"),
             assistant("working...", "toolUse"),
             task("Task AAA"),
-            notification("Task stored. Use `/start-task` or `/auto` to start it."),
             notification("Task aborted. Branch abandoned without summary."),
           );
         }).children(
@@ -133,9 +130,6 @@ describe("manual workflow", () => {
                 user("main work"),
                 assistant("working...", "toolUse"),
                 task("Task AAA"),
-                notification("Task stored. Use `/start-task` or `/auto` to start it."),
-                notification("Task aborted. Branch abandoned without summary."),
-                notification("Task finished. Last response attached."),
                 taskResult("task-aaa", "Done."),
                 assistant("Great!"),
               );
@@ -164,7 +158,6 @@ describe("manual workflow", () => {
               user("some more work"),
               assistant("okay", "toolUse"),
               task("Task BBB"),
-              notification("Task stored. Use `/start-task` or `/auto` to start it."),
               notification("Task discarded."),
             );
           }).children(
@@ -205,8 +198,6 @@ describe("manual workflow", () => {
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA"),
-                  notification("Task stored. Use `/start-task` or `/auto` to start it."),
-                  notification("Task finished. Last response attached."),
                   taskResult("task-aaa", "Great!"),
                   assistant("Great!"),
                 );
@@ -221,7 +212,6 @@ describe("manual workflow", () => {
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB"),
-                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task aborted. Branch abandoned without summary."),
               );
             }).children(
@@ -232,8 +222,6 @@ describe("manual workflow", () => {
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA"),
-                  notification("Task stored. Use `/start-task` or `/auto` to start it."),
-                  notification("Task finished. Last response attached."),
                   taskResult("task-aaa", "okay"),
                   assistant("Great!"),
                 );
@@ -325,7 +313,6 @@ describe("manual workflow", () => {
                 user("some more work"),
                 assistant("okay", "toolUse"),
                 task("Task BBB", true),
-                notification("Task stored. Use `/start-task` or `/auto` to start it."),
                 notification("Task aborted. Branch abandoned without summary."),
               );
             }).children(
@@ -336,8 +323,6 @@ describe("manual workflow", () => {
                   user("main work"),
                   assistant("working...", "toolUse"),
                   task("Task AAA"),
-                  notification("Task stored. Use `/start-task` or `/auto` to start it."),
-                  notification("Task finished. Last response attached."),
                   taskResult("task-aaa", "okay"),
                   assistant("Great!"),
                 );
@@ -371,7 +356,6 @@ describe("manual workflow", () => {
           user("main work"),
           assistant("working...", "toolUse"),
           task("Task AAA", true),
-          notification("Task stored. Use `/start-task` or `/auto` to start it."),
           notification("Task discarded."),
         );
       }),
