@@ -26,46 +26,36 @@ export function assumeCommandContext<T extends object>(value: T): ExtensionComma
 export class TestSession {
   constructor(private readonly sessionManager: SessionManager) {}
 
-  readonly taskStatusHistory: Array<string | undefined> = [];
-
-  #lastNotification: TrackedNotification | undefined;
-
-  #status: string | undefined;
+  #lastNotification: string | undefined;
+  #lastStatus: string | undefined;
+  #statusEntries: TrackedStatusEntry[] = [];
 
   readonly context: ExtensionUIContext = {
     ...noOpContext,
     notify: (message: string) => {
-      this.#lastNotification = {
-        message: plainText(message),
-        anchorEntryId: this.sessionManager.getLeafId()!,
-      };
+      const nextNotification = plainText(message).trim();
+      this.#lastNotification = nextNotification === "" ? undefined : nextNotification;
     },
     setStatus: (key: string, value: string | undefined) => {
       if (key !== "task") return;
-      const nextValue = value === undefined ? undefined : plainText(value);
-      this.#status = nextValue;
-      this.taskStatusHistory.push(nextValue);
+
+      const nextStatus = value === undefined ? undefined : plainText(value);
+      if (nextStatus === this.#lastStatus) return;
+
+      this.#lastStatus = nextStatus;
+      this.#statusEntries.push({
+        anchorEntryId: this.sessionManager.getLeafId() ?? null,
+        entry: status(nextStatus),
+      });
     },
   };
 
   entries(): SessionEntry[] {
-    const branch = this.sessionManager.getBranch();
-    const visible: SessionEntry[] = durableEntries(branch);
-    if (!this.#lastNotification) return visible;
-
-    const { anchorEntryId, message } = this.#lastNotification;
-
-    // Only show notification if no durable entries exist after the anchor.
-    const anchorIdx = branch.findIndex((e) => e.id === anchorEntryId);
-    if (anchorIdx < 0) return visible;
-
-    const hasLaterVisible = branch.slice(anchorIdx + 1).some((e) => toDurableEntry(e) !== null);
-    if (!hasLaterVisible) visible.push(notification(message));
-    return visible;
+    return projectEntries(this.sessionManager.getBranch(), this.#statusEntries);
   }
 
-  get status(): string | undefined {
-    return this.#status;
+  get lastNotification(): string | undefined {
+    return this.#lastNotification;
   }
 }
 
@@ -79,14 +69,14 @@ export function durableEntries(entries: PiSessionEntry[]): DurableSessionEntry[]
     .filter((entry): entry is DurableSessionEntry => entry !== null);
 }
 
-export type DurableSessionEntry = Exclude<SessionEntry, NotificationEntry>;
+export type DurableSessionEntry = Exclude<SessionEntry, StatusEntry>;
 
 export type SessionEntry =
   | ReturnType<typeof user>
   | ReturnType<typeof assistant>
   | ReturnType<typeof task>
   | ReturnType<typeof taskResult>
-  | NotificationEntry;
+  | StatusEntry;
 
 // ---------------------------------------------------------------------------
 // Descriptor constructors
@@ -122,25 +112,49 @@ export const taskResult = (slug: string, content?: string) => ({
   ...(content !== undefined ? { content: [textBlock(content)] } : {}),
 });
 
-export const notification = (message: string): NotificationEntry => ({
-  type: "notification",
-  message,
-});
+export type StatusEntry = { type: "status"; text?: string };
 
-// ---------------------------------------------------------------------------
-// Exported types
-// ---------------------------------------------------------------------------
-
-export type NotificationEntry = { type: "notification"; message: string };
-
-type TrackedNotification = {
-  message: string;
-  anchorEntryId: string;
-};
+export const status = (text?: string): StatusEntry =>
+  text === undefined ? { type: "status" } : { type: "status", text };
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+type TrackedStatusEntry = {
+  anchorEntryId: string | null;
+  entry: StatusEntry;
+};
+
+function projectEntries(
+  branch: PiSessionEntry[],
+  trackedStatuses: readonly TrackedStatusEntry[],
+): SessionEntry[] {
+  const result: SessionEntry[] = [];
+
+  for (const branchEntry of branch) {
+    const durable = toDurableEntry(branchEntry);
+    if (durable !== null) result.push(durable);
+
+    for (const tracked of trackedStatuses) {
+      if (tracked.anchorEntryId !== branchEntry.id) continue;
+      if (sameStatus(result.at(-1), tracked.entry)) continue;
+      result.push(tracked.entry);
+    }
+  }
+
+  for (const tracked of trackedStatuses) {
+    if (tracked.anchorEntryId !== null) continue;
+    if (sameStatus(result.at(-1), tracked.entry)) continue;
+    result.unshift(tracked.entry);
+  }
+
+  return result;
+}
+
+function sameStatus(left: SessionEntry | undefined, right: StatusEntry): boolean {
+  return left?.type === "status" && left.text === right.text;
+}
 
 function plainText(value: string): string {
   return stripVTControlCharacters(value);

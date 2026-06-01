@@ -1,7 +1,7 @@
 export {
   assistant,
   assumeCommandContext,
-  notification,
+  status,
   task,
   taskResult,
   user,

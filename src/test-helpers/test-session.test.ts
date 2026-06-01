@@ -4,10 +4,10 @@ import { describe, it } from "node:test";
 
 import { SessionManager, Theme } from "@earendil-works/pi-coding-agent";
 
-import { TestSession, assistant, assumeCommandContext, notification, task, user } from "./index.js";
+import { TestSession, assistant, assumeCommandContext, status, task, user } from "./index.js";
 
 describe("TestSession", () => {
-  it("shows a notification when it is the last log event", () => {
+  it("projects task status changes inline with durable session entries", () => {
     const sm = SessionManager.inMemory();
     const session = new TestSession(sm);
 
@@ -16,85 +16,75 @@ describe("TestSession", () => {
       prompt: "Task AAA",
       inherit_context: false,
     });
-    session.context.notify("Task stored. Use `/start-task` or `/auto` to start it.");
+    session.context.setStatus("task", "pending task: task-aaa");
+    appendAssistant(sm, "queued");
 
     assert.deepStrictEqual(session.entries(), [
       user("main work"),
       task("Task AAA"),
-      notification("Task stored. Use `/start-task` or `/auto` to start it."),
+      status("pending task: task-aaa"),
+      assistant("queued"),
     ]);
   });
 
-  it("hides a notification after a later visible entry is appended", () => {
+  it("adds status() when task status clears", () => {
     const sm = SessionManager.inMemory();
     const session = new TestSession(sm);
 
     appendUser(sm, "Task AAA");
+    session.context.setStatus("task", "current task: task-aaa");
     appendAssistant(sm, "Done.");
-    sm.appendCustomEntry("task-done", {});
-    session.context.notify("Task finished. Last response attached.");
-    appendAssistant(sm, "Great!");
+    session.context.setStatus("task", undefined);
 
     assert.deepStrictEqual(session.entries(), [
       user("Task AAA"),
+      status("current task: task-aaa"),
       assistant("Done."),
-      assistant("Great!"),
+      status(),
     ]);
   });
 
-  it("keeps only the last notification for one anchor", () => {
+  it("suppresses duplicate consecutive task statuses and ignores non-task keys", () => {
     const sm = SessionManager.inMemory();
     const session = new TestSession(sm);
 
     appendUser(sm, "main work");
-    session.context.notify("first");
-    session.context.notify("second");
+    session.context.setStatus("other", "ignored");
+    session.context.setStatus("task", "pending task: task-aaa");
+    session.context.setStatus("task", "pending task: task-aaa");
 
-    assert.deepStrictEqual(session.entries(), [user("main work"), notification("second")]);
+    assert.deepStrictEqual(session.entries(), [
+      user("main work"),
+      status("pending task: task-aaa"),
+    ]);
   });
 
-  it("omits notifications anchored to entries outside the current branch", () => {
+  it("normalizes ANSI styling in stored task statuses and notifications", () => {
     const sm = SessionManager.inMemory();
     const session = new TestSession(sm);
 
-    const rootId = appendUser(sm, "main work");
-    appendAssistant(sm, "branch A");
-    session.context.notify("branch A note");
-
-    sm.branch(rootId);
-    appendAssistant(sm, "branch B");
-
-    assert.deepStrictEqual(session.entries(), [user("main work"), assistant("branch B")]);
-  });
-
-  it("accepts notification levels without exposing them in visible assertions", () => {
-    const sm = SessionManager.inMemory();
-    const session = new TestSession(sm);
-
-    appendUser(sm, "main work");
-    session.context.notify("warn once", "warning");
-
-    assert.deepStrictEqual(session.entries(), [user("main work"), notification("warn once")]);
-  });
-
-  it("stores plain notification text when given themed output", () => {
-    const sm = SessionManager.inMemory();
-    const session = new TestSession(sm);
-
-    appendUser(sm, "main work");
+    session.context.setStatus(
+      "task",
+      session.context.theme.fg("dim", "pending task: task-aaa"),
+    );
     session.context.notify(session.context.theme.fg("warning", "warn once"), "warning");
 
-    assert.deepStrictEqual(session.entries(), [user("main work"), notification("warn once")]);
+    assert.deepStrictEqual(session.entries(), [status("pending task: task-aaa")]);
+    assert.strictEqual(session.lastNotification, "warn once");
   });
 
-  it("stores plain task status text when given themed output", () => {
+  it("keeps notifications out of visible session assertions", () => {
     const sm = SessionManager.inMemory();
     const session = new TestSession(sm);
 
-    session.context.setStatus("task", session.context.theme.fg("dim", "pending task: task-aaa"));
+    appendUser(sm, "main work");
+    session.context.notify("Task stored. Use `/start-task` or `/auto` to start it.");
 
-    assert.strictEqual(session.status, "pending task: task-aaa");
-    assert.deepStrictEqual(session.taskStatusHistory, ["pending task: task-aaa"]);
+    assert.deepStrictEqual(session.entries(), [user("main work")]);
+    assert.strictEqual(
+      session.lastNotification,
+      "Task stored. Use `/start-task` or `/auto` to start it.",
+    );
   });
 
   it("exposes a real Theme on the UI context", () => {
