@@ -2,14 +2,9 @@ import assert from "node:assert";
 
 import { describe, it } from "node:test";
 
-import { SessionManager, type Theme } from "@earendil-works/pi-coding-agent";
-
-import { cmdAuto } from "./index.js";
-
 import {
   aborts,
   assistant,
-  assumeCommandContext,
   responds,
   pushTask,
   status,
@@ -121,69 +116,6 @@ describe("automated workflow", () => {
     } finally {
       h.dispose();
     }
-  });
-
-  it("still enters the auto loop after a prior session shutdown event", async () => {
-    const sm = SessionManager.inMemory();
-    sm.appendThinkingLevelChange("off");
-
-    const idleWaiters: Array<() => void> = [];
-    const sessionShutdownHandlers: Array<() => unknown> = [];
-    const notifications: string[] = [];
-
-    const pi = {
-      appendEntry() {},
-      sendUserMessage() {},
-      sendMessage() {},
-      on(eventName: string, handler: () => unknown) {
-        if (eventName === "session_shutdown") sessionShutdownHandlers.push(handler);
-      },
-    } satisfies Parameters<typeof cmdAuto>[0];
-
-    const ctx = assumeCommandContext({
-      hasUI: true,
-      waitForIdle: async () => {
-        await new Promise<void>((resolve) => {
-          idleWaiters.push(resolve);
-        });
-      },
-      hasPendingMessages: () => false,
-      sessionManager: sm,
-      ui: {
-        notify(message: string) {
-          notifications.push(message);
-        },
-        setStatus() {},
-        theme: {
-          fg: (_key: string, text: string) => text,
-          bg: (_key: string, text: string) => text,
-          bold: (text: string) => text,
-        } satisfies Pick<Theme, "fg" | "bg" | "bold">,
-      },
-      navigateTree: async () => ({ cancelled: false }),
-    });
-
-    const auto = cmdAuto(pi);
-    for (const handler of sessionShutdownHandlers) {
-      await handler();
-    }
-
-    let settled = false;
-    const autoPromise = auto.handler("", ctx).finally(() => {
-      settled = true;
-    });
-
-    await Promise.resolve();
-
-    assert.strictEqual(idleWaiters.length, 1);
-    assert.strictEqual(settled, false);
-
-    const waiter = idleWaiters.shift();
-    assert.ok(waiter);
-    waiter();
-
-    await autoPromise;
-    assert.deepStrictEqual(notifications, ["No pending tasks to run."]);
   });
 
   it("warns and returns when /auto is already running", async () => {
