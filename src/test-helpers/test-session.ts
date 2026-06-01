@@ -17,18 +17,6 @@ export function assumeCommandContext<T extends object>(value: T): ExtensionComma
 }
 
 // ---------------------------------------------------------------------------
-// Durable-entry projection helper
-// ---------------------------------------------------------------------------
-
-export function durableEntries(entries: PiSessionEntry[]): DurableSessionEntry[] {
-  return entries
-    .map(toDurableEntry)
-    .filter((entry): entry is DurableSessionEntry => entry !== null);
-}
-
-export type DurableSessionEntry = Exclude<SessionEntry, NotificationEntry>;
-
-// ---------------------------------------------------------------------------
 // TestSession — canonical visible-session model
 // ---------------------------------------------------------------------------
 
@@ -93,6 +81,18 @@ export class TestSession {
     return this.#status;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Durable-entry projection helper
+// ---------------------------------------------------------------------------
+
+export function durableEntries(entries: PiSessionEntry[]): DurableSessionEntry[] {
+  return entries
+    .map(toDurableEntry)
+    .filter((entry): entry is DurableSessionEntry => entry !== null);
+}
+
+export type DurableSessionEntry = Exclude<SessionEntry, NotificationEntry>;
 
 export type SessionEntry =
   | ReturnType<typeof user>
