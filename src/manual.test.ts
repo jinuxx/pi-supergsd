@@ -6,6 +6,7 @@ import {
   notification,
   responds,
   pushTask,
+  run,
   task,
   taskResult,
   user,
@@ -14,26 +15,24 @@ import {
 import { describe } from "node:test";
 
 describe("manual workflow", () => {
-  // ── Non-inherit tree ───────────────────────────────────────────────
-
-  node("push AAA", async (h) => {
-    h.llm.onPrompt("main work", responds("working..."), pushTask("Task AAA"));
-    h.llm.onPrompt("Task AAA", responds("Done."));
-    h.llm.onPrompt("Done.", responds("Great!"));
-    h.llm.onPrompt("Great!", responds("Great!"));
-    h.llm.onPrompt("okay", responds("Great!"));
-    h.llm.onPrompt("Task BBB", responds("inner done"));
-    h.llm.onPrompt("inner done", responds("Great!"));
-    await h.prompt("main work");
-    assert.strictEqual(h.getStatus(), "pending task: task-aaa");
-    h.assertSession(
-      user("main work"),
-      assistant("working...", "toolUse"),
-      task("Task AAA"),
-      notification("Task stored. Use `/start-task` or `/auto` to start it."),
-    );
-  })
-    .children(
+  run(
+    node("push AAA", async (h) => {
+      h.llm.onPrompt("main work", responds("working..."), pushTask("Task AAA"));
+      h.llm.onPrompt("Task AAA", responds("Done."));
+      h.llm.onPrompt("Done.", responds("Great!"));
+      h.llm.onPrompt("Great!", responds("Great!"));
+      h.llm.onPrompt("okay", responds("Great!"));
+      h.llm.onPrompt("Task BBB", responds("inner done"));
+      h.llm.onPrompt("inner done", responds("Great!"));
+      await h.prompt("main work");
+      assert.strictEqual(h.getStatus(), "pending task: task-aaa");
+      h.assertSession(
+        user("main work"),
+        assistant("working...", "toolUse"),
+        task("Task AAA"),
+        notification("Task stored. Use `/start-task` or `/auto` to start it."),
+      );
+    }).children(
       node("discard AAA", async (h) => {
         await h.prompt("/discard-task");
         assert.strictEqual(h.getStatus(), undefined);
@@ -368,29 +367,24 @@ describe("manual workflow", () => {
           ),
         ),
       ),
-    )
-    .run();
-
-  // ── Inherit tree ───────────────────────────────────────────────────
-
-  node("push AAA [inherit]", async (h) => {
-    h.llm.onPrompt("main work", responds("working..."), pushTask("Task AAA", true));
-    h.llm.onPrompt("Task AAA", responds("Done."));
-    h.llm.onPrompt("Done.", responds("Great!"));
-    h.llm.onPrompt("Great!", responds("Great!"));
-    h.llm.onPrompt("okay", responds("Great!"));
-    h.llm.onPrompt("Task BBB", responds("inner done"));
-    h.llm.onPrompt("inner done", responds("Great!"));
-    await h.prompt("main work");
-    assert.strictEqual(h.getStatus(), "pending task: task-aaa");
-    h.assertSession(
-      user("main work"),
-      assistant("working...", "toolUse"),
-      task("Task AAA", true),
-      notification("Task stored. Use `/start-task` or `/auto` to start it."),
-    );
-  })
-    .children(
+    ),
+    node("push AAA [inherit]", async (h) => {
+      h.llm.onPrompt("main work", responds("working..."), pushTask("Task AAA", true));
+      h.llm.onPrompt("Task AAA", responds("Done."));
+      h.llm.onPrompt("Done.", responds("Great!"));
+      h.llm.onPrompt("Great!", responds("Great!"));
+      h.llm.onPrompt("okay", responds("Great!"));
+      h.llm.onPrompt("Task BBB", responds("inner done"));
+      h.llm.onPrompt("inner done", responds("Great!"));
+      await h.prompt("main work");
+      assert.strictEqual(h.getStatus(), "pending task: task-aaa");
+      h.assertSession(
+        user("main work"),
+        assistant("working...", "toolUse"),
+        task("Task AAA", true),
+        notification("Task stored. Use `/start-task` or `/auto` to start it."),
+      );
+    }).children(
       node("discard AAA", async (h) => {
         await h.prompt("/discard-task");
         assert.strictEqual(h.getStatus(), undefined);
@@ -776,56 +770,50 @@ describe("manual workflow", () => {
           ),
         ),
       ),
-    )
-    .run();
-
-  // ── Standalone no-task leaf nodes ──────────────────────────────────
-
-  node("start [no task]", async (h) => {
-    h.llm.onPrompt("main work", responds("working..."));
-    await h.prompt("main work");
-    await h.prompt("/start-task");
-    assert.strictEqual(h.getStatus(), undefined);
-    h.assertSession(
-      user("main work"),
-      assistant("working..."),
-      notification("No pending task. Use push-task first."),
-    );
-  }).run();
-
-  node("discard [no task]", async (h) => {
-    h.llm.onPrompt("main work", responds("working..."));
-    await h.prompt("main work");
-    await h.prompt("/discard-task");
-    assert.strictEqual(h.getStatus(), undefined);
-    h.assertSession(
-      user("main work"),
-      assistant("working..."),
-      notification("No pending task to discard."),
-    );
-  }).run();
-
-  node("finish [no task]", async (h) => {
-    h.llm.onPrompt("main work", responds("working..."));
-    await h.prompt("main work");
-    await h.prompt("/finish-task");
-    assert.strictEqual(h.getStatus(), undefined);
-    h.assertSession(
-      user("main work"),
-      assistant("working..."),
-      notification("Not inside task, nothing to finish."),
-    );
-  }).run();
-
-  node("abort [no task]", async (h) => {
-    h.llm.onPrompt("main work", responds("working..."));
-    await h.prompt("main work");
-    await h.prompt("/abort-task");
-    assert.strictEqual(h.getStatus(), undefined);
-    h.assertSession(
-      user("main work"),
-      assistant("working..."),
-      notification("Not inside task, nothing to abort."),
-    );
-  }).run();
+    ),
+    node("start [no task]", async (h) => {
+      h.llm.onPrompt("main work", responds("working..."));
+      await h.prompt("main work");
+      await h.prompt("/start-task");
+      assert.strictEqual(h.getStatus(), undefined);
+      h.assertSession(
+        user("main work"),
+        assistant("working..."),
+        notification("No pending task. Use push-task first."),
+      );
+    }),
+    node("discard [no task]", async (h) => {
+      h.llm.onPrompt("main work", responds("working..."));
+      await h.prompt("main work");
+      await h.prompt("/discard-task");
+      assert.strictEqual(h.getStatus(), undefined);
+      h.assertSession(
+        user("main work"),
+        assistant("working..."),
+        notification("No pending task to discard."),
+      );
+    }),
+    node("finish [no task]", async (h) => {
+      h.llm.onPrompt("main work", responds("working..."));
+      await h.prompt("main work");
+      await h.prompt("/finish-task");
+      assert.strictEqual(h.getStatus(), undefined);
+      h.assertSession(
+        user("main work"),
+        assistant("working..."),
+        notification("Not inside task, nothing to finish."),
+      );
+    }),
+    node("abort [no task]", async (h) => {
+      h.llm.onPrompt("main work", responds("working..."));
+      await h.prompt("main work");
+      await h.prompt("/abort-task");
+      assert.strictEqual(h.getStatus(), undefined);
+      h.assertSession(
+        user("main work"),
+        assistant("working..."),
+        notification("Not inside task, nothing to abort."),
+      );
+    }),
+  );
 });

@@ -22,8 +22,10 @@ class TestNode {
     return this;
   }
 
-  run(): void {
-    this.register([]);
+  static run(...nodes: TestNode[]): void {
+    for (const node of nodes) {
+      node.register([]);
+    }
   }
 
   private register(ancestors: TestNode[]): void {
@@ -52,3 +54,6 @@ class TestNode {
     }
   }
 }
+
+// eslint-disable-next-line unslop/no-single-use-constants -- public API for test authors
+export const run = TestNode.run;
