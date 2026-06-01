@@ -24,7 +24,12 @@
         { "op": "replace", "find": "Run same scenarios WITH skill. Agent should now comply.", "replace": "Run same scenarios WITH skill. Agent should now comply.\n\nUse the `push-task` tool to run the same scenario with the skill loaded. Act on the returned task result when you get it, then confirm compliance." },
         { "op": "replace", "find": "### REFACTOR: Close Loopholes\n\nAgent found new rationalization? Add explicit counter. Re-test until bulletproof.", "replace": "### REFACTOR: Close Loopholes\n\nAgent found a new rationalization? Add an explicit counter. Use the `push-task` tool to re-test with the updated scenario and skill, then act on the returned task result when you get it. Re-test until bulletproof." },
         { "op": "replace", "find": "[Dispatch subagent → synthesis]", "replace": "[push-task → synthesis]" },
-        { "op": "replace", "find": "**Testing methodology:** See @testing-skills-with-subagents.md for the complete testing methodology:", "replace": "**Testing methodology:** See @testing-skills-with-subagents.md for the complete testing methodology (filename references a legacy term; content uses current navigator terminology):" }
+        { "op": "replace", "find": "**Testing methodology:** See @testing-skills-with-subagents.md for the complete testing methodology:", "replace": "**Testing methodology:** See @testing-skills-with-subagents.md for the complete testing methodology (filename references a legacy term; content uses current navigator terminology):" },
+        {
+          "op": "replace",
+          "find": "description: Use when creating new skills, editing existing skills, or verifying skills work before deployment\n---",
+          "replace": "description: Use when creating new skills, editing existing skills, or verifying skills work before deployment\ndisable-model-invocation: true\n---"
+        }
       ]
     },
     {
