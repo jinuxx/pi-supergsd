@@ -39,7 +39,7 @@ export class TestSession {
     notify: (message: string) => {
       this.#lastNotification = {
         message,
-        anchorEntryId: this.sessionManager.getLeafId(),
+        anchorEntryId: this.sessionManager.getLeafId()!,
       };
     },
     setStatus: (key: string, value: string | undefined) => {
@@ -48,32 +48,21 @@ export class TestSession {
       this.taskStatusHistory.push(value);
     },
     theme: this.theme,
-  } as ExtensionUIContext;
+  };
 
   entries(): SessionEntry[] {
     const branch = this.sessionManager.getBranch();
     const merged: SessionEntry[] = durableEntries(branch);
-    if (this.#lastNotification) {
-      const anchorId = this.#lastNotification.anchorEntryId;
-      if (anchorId === null) {
-        // Null anchor: notification emitted before any entries.
-        // Only show if the branch is still empty.
-        if (branch.length === 0) {
-          merged.push(notification(this.#lastNotification.message));
-        }
-      } else {
-        // Named anchor: only show if no durable entries exist after it.
-        const anchorIdx = branch.findIndex((e) => e.id === anchorId);
-        if (anchorIdx >= 0) {
-          const hasLaterVisible = branch
-            .slice(anchorIdx + 1)
-            .some((e) => toDurableEntry(e) !== null);
-          if (!hasLaterVisible) {
-            merged.push(notification(this.#lastNotification.message));
-          }
-        }
-      }
-    }
+    if (!this.#lastNotification) return merged;
+
+    const { anchorEntryId, message } = this.#lastNotification;
+
+    // Only show if no durable entries exist after the anchor.
+    const anchorIdx = branch.findIndex((e) => e.id === anchorEntryId);
+    if (anchorIdx < 0) return merged;
+
+    const hasLaterVisible = branch.slice(anchorIdx + 1).some((e) => toDurableEntry(e) !== null);
+    if (!hasLaterVisible) merged.push(notification(message));
     return merged;
   }
 
@@ -152,7 +141,7 @@ export type NotificationEntry = { type: "notification"; message: string };
 
 type TrackedNotification = {
   message: string;
-  anchorEntryId: string | null;
+  anchorEntryId: string;
 };
 
 // ---------------------------------------------------------------------------

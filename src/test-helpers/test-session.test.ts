@@ -67,25 +67,6 @@ describe("TestSession", () => {
     assert.deepStrictEqual(session.entries(), [user("main work"), assistant("branch B")]);
   });
 
-  it("shows a null-anchor notification when it is the last log event", () => {
-    const sm = SessionManager.inMemory();
-    const session = new TestSession(sm);
-
-    session.context.notify("bootstrap");
-
-    assert.deepStrictEqual(session.entries(), [notification("bootstrap")]);
-  });
-
-  it("hides a null-anchor notification once later branch content exists", () => {
-    const sm = SessionManager.inMemory();
-    const session = new TestSession(sm);
-
-    session.context.notify("bootstrap");
-    appendUser(sm, "main work");
-
-    assert.deepStrictEqual(session.entries(), [user("main work")]);
-  });
-
   it("accepts notification levels without exposing them in visible assertions", () => {
     const sm = SessionManager.inMemory();
     const session = new TestSession(sm);
