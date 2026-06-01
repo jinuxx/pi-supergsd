@@ -123,10 +123,7 @@ export class TestHarness {
         case "custom":
           continue;
         case "message":
-          return (
-            entry.message.role === "user" &&
-            this.pi.isTriggeredUserMessage(entry.id)
-          );
+          return entry.message.role === "user" && this.pi.isTriggeredUserMessage(entry.id);
         case "custom_message":
           return this.pi.isTriggeredCustomMessage(entry.id);
         default:
@@ -219,13 +216,7 @@ export class TestHarness {
 
   async runPushTask(prompt: string, inherit_context?: boolean): Promise<void> {
     const tool = toolPushTask(this.pi);
-    await tool.execute(
-      "call-1",
-      { prompt, inherit_context },
-      undefined,
-      undefined,
-      this.ctx,
-    );
+    await tool.execute("call-1", { prompt, inherit_context }, undefined, undefined, this.ctx);
   }
 
   async runStartTask(): Promise<void> {
@@ -388,22 +379,16 @@ export class TestHarness {
   private entryMatches(entry: SessionEntry, match: MatchDescriptor): boolean {
     if (match.type === "message") {
       if (entry.type !== "message") return false;
-      if (entry.message.role !== "user" && entry.message.role !== "assistant")
-        return false;
+      if (entry.message.role !== "user" && entry.message.role !== "assistant") return false;
       if (entry.message.role !== match.message.role) return false;
 
       const matchText = extractContentText(match.message.content);
       const entryText = extractContentText(entry.message.content);
-      return (
-        matchText !== null &&
-        entryText !== null &&
-        entryText.includes(matchText)
-      );
+      return matchText !== null && entryText !== null && entryText.includes(matchText);
     }
 
     if (match.type === "custom") {
-      if (entry.type !== "custom" || entry.customType !== match.customType)
-        return false;
+      if (entry.type !== "custom" || entry.customType !== match.customType) return false;
       const entryData = readTaskData(entry.data);
       return (
         entryData !== null &&
@@ -461,18 +446,13 @@ function isHiddenEntry(entry: SessionEntry): boolean {
     case "label":
       return true;
     case "custom":
-      return (
-        entry.customType === "task-done" || entry.customType === "task-start"
-      );
+      return entry.customType === "task-done" || entry.customType === "task-start";
     default:
       return false;
   }
 }
 
-function makeAssistantMessage(
-  text: string,
-  stopReason?: string,
-): AssistantAppendedMessage {
+function makeAssistantMessage(text: string, stopReason?: string): AssistantAppendedMessage {
   return {
     role: "assistant",
     content: [{ type: "text", text }],
@@ -504,27 +484,17 @@ type AssistantAppendedMessage = Extract<AppendedMessage, { role: "assistant" }>;
 
 type AppendedMessage = Parameters<SessionManager["appendMessage"]>[0];
 
-function readTaskData(
-  data: unknown,
-): { prompt: string; inherit_context: boolean } | null {
+function readTaskData(data: unknown): { prompt: string; inherit_context: boolean } | null {
   if (!isRecord(data)) return null;
-  if (
-    typeof data.prompt !== "string" ||
-    typeof data.inherit_context !== "boolean"
-  )
-    return null;
+  if (typeof data.prompt !== "string" || typeof data.inherit_context !== "boolean") return null;
   return { prompt: data.prompt, inherit_context: data.inherit_context };
 }
 
 function readTaskResultSlug(details: unknown): string | null {
-  return isRecord(details) && typeof details.slug === "string"
-    ? details.slug
-    : null;
+  return isRecord(details) && typeof details.slug === "string" ? details.slug : null;
 }
 
-function normalizeStopReason(
-  stopReason?: string,
-): AssistantAppendedMessage["stopReason"] {
+function normalizeStopReason(stopReason?: string): AssistantAppendedMessage["stopReason"] {
   switch (stopReason) {
     case "length":
     case "toolUse":

@@ -94,9 +94,7 @@ const taskResult = (slug: string, content?: string): TaskResultEntry => ({
   type: "custom_message",
   customType: "task-result",
   details: { slug },
-  ...(content !== undefined
-    ? { content: [{ type: "text", text: content }] }
-    : {}),
+  ...(content !== undefined ? { content: [{ type: "text", text: content }] } : {}),
 });
 
 type TaskResultEntry = {
@@ -127,8 +125,6 @@ const notification = (text: string): NotificationEntry => ({
   afterEntryId: null,
 });
 
-function assumeCommandContext<T extends object>(
-  value: T,
-): ExtensionCommandContext & T {
+function assumeCommandContext<T extends object>(value: T): ExtensionCommandContext & T {
   return value as unknown as ExtensionCommandContext & T;
 }

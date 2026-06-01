@@ -1,7 +1,4 @@
-import {
-  SessionManager,
-  type ExtensionAPI,
-} from "@earendil-works/pi-coding-agent";
+import { SessionManager, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { extractTextContent as readTextContent } from "../text-content.js";
 
@@ -12,21 +9,15 @@ export class PiStub implements Partial<ExtensionAPI> {
   private readonly triggeredCustomMessages = new Set<string>();
   private readonly triggeredUserMessages = new Set<string>();
 
-  readonly on: ExtensionAPI["on"] = ((
-    eventName: string,
-    handler: () => unknown,
-  ) => {
-    if (eventName === "session_shutdown")
-      this.sessionShutdownHandlers.push(handler);
+  readonly on: ExtensionAPI["on"] = ((eventName: string, handler: () => unknown) => {
+    if (eventName === "session_shutdown") this.sessionShutdownHandlers.push(handler);
   }) as ExtensionAPI["on"];
 
   appendEntry(customType: string, data?: unknown): void {
     this.sessionManager.appendCustomEntry(customType, data);
   }
 
-  sendUserMessage(
-    content: Parameters<ExtensionAPI["sendUserMessage"]>[0],
-  ): void {
+  sendUserMessage(content: Parameters<ExtensionAPI["sendUserMessage"]>[0]): void {
     const text = extractContentText(content) ?? "";
     this.sessionManager.appendMessage(makeUserMessage(text, Date.now()));
     this.recordLastEntry(this.triggeredUserMessages);

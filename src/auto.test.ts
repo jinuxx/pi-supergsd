@@ -35,14 +35,10 @@ describe("automated workflow", () => {
     );
 
     await h.runAuto({
-      reactions: [
-        [user("Analyze performance"), assistant("Found 3 bottlenecks: ...")],
-      ],
+      reactions: [[user("Analyze performance"), assistant("Found 3 bottlenecks: ...")]],
     });
 
-    h.assertTaskStatusHistoryIncludes(
-      "[auto] pending task: analyze-performance",
-    );
+    h.assertTaskStatusHistoryIncludes("[auto] pending task: analyze-performance");
     h.assertBranchHistory(
       user("main work"),
       assistant("working on main..."),
@@ -116,8 +112,7 @@ describe("automated workflow", () => {
       sendUserMessage() {},
       sendMessage() {},
       on(eventName: string, handler: () => unknown) {
-        if (eventName === "session_shutdown")
-          sessionShutdownHandlers.push(handler);
+        if (eventName === "session_shutdown") sessionShutdownHandlers.push(handler);
       },
     } satisfies Parameters<typeof cmdAuto>[0];
 
@@ -198,9 +193,7 @@ describe("automated workflow", () => {
     await h.runPushTask("Implement phase 1.", true);
 
     await h.runAuto({
-      reactions: [
-        [user("Implement phase 1"), assistant("Stopped by user.", "aborted")],
-      ],
+      reactions: [[user("Implement phase 1"), assistant("Stopped by user.", "aborted")]],
     });
 
     h.assertBranchHistory(

@@ -1,13 +1,6 @@
 import assert from "node:assert";
 
-import {
-  assistant,
-  notification,
-  node,
-  task,
-  taskResult,
-  user,
-} from "./test-helpers/index.js";
+import { assistant, notification, node, task, taskResult, user } from "./test-helpers/index.js";
 
 import { describe } from "node:test";
 
@@ -147,9 +140,7 @@ describe("manual workflow", () => {
             user("Task AAA"),
             assistant("some more work"),
             task("Task BBB"),
-            notification(
-              "Task stored. Use `/start-task` or `/auto` to start it.",
-            ),
+            notification("Task stored. Use `/start-task` or `/auto` to start it."),
           );
         }).children(
           node("discard BBB", async (h) => {
@@ -247,9 +238,7 @@ describe("manual workflow", () => {
             user("Task AAA"),
             assistant("some more work"),
             task("Task BBB", true),
-            notification(
-              "Task stored. Use `/start-task` or `/auto` to start it.",
-            ),
+            notification("Task stored. Use `/start-task` or `/auto` to start it."),
           );
         }).children(
           node("discard BBB [inherit]", async (h) => {
@@ -495,9 +484,7 @@ describe("manual workflow", () => {
             user("Task AAA"),
             assistant("some more work"),
             task("Task BBB"),
-            notification(
-              "Task stored. Use `/start-task` or `/auto` to start it.",
-            ),
+            notification("Task stored. Use `/start-task` or `/auto` to start it."),
           );
         }).children(
           node("discard BBB", async (h) => {
@@ -607,9 +594,7 @@ describe("manual workflow", () => {
             user("Task AAA"),
             assistant("some more work"),
             task("Task BBB", true),
-            notification(
-              "Task stored. Use `/start-task` or `/auto` to start it.",
-            ),
+            notification("Task stored. Use `/start-task` or `/auto` to start it."),
           );
         }).children(
           node("discard BBB [inherit]", async (h) => {
