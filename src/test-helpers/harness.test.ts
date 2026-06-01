@@ -139,7 +139,6 @@ describe("AgentSession-backed TestHarness foundation", () => {
       user("queue follow-up"),
       assistant("", "toolUse"),
       task("follow-up"),
-      notification("Task stored. Use `/start-task` or `/auto` to start it."),
       user("answer follow-up"),
       assistant("queued response"),
     );
