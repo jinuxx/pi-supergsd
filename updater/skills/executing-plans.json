@@ -11,6 +11,11 @@
         {
           "op": "delete-line",
           "find": "using-git-worktrees"
+        },
+        {
+          "op": "replace",
+          "find": "description: Use when you have a written implementation plan to execute in a separate session with review checkpoints\n---",
+          "replace": "description: Use when you have a written implementation plan to execute in a separate session with review checkpoints\ndisable-model-invocation: true\n---"
         }
       ]
     }

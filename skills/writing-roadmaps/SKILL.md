@@ -1,6 +1,7 @@
 ---
 name: writing-roadmaps
 description: Use when an approved design or spec is too large for one implementation plan, needs ordered phases, or may exceed a single context window
+disable-model-invocation: true
 ---
 
 # Writing Roadmaps

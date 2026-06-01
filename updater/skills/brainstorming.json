@@ -43,6 +43,11 @@
           "op": "replace",
           "find": "**Spec Self-Review:**\nAfter writing the spec document, look at it with fresh eyes:",
           "replace": "**Spec Self-Review:**\nAfter writing the spec document, use the `push-task` tool with `spec-document-reviewer-prompt.md` to request a fresh-context spec review. Act on the returned task result when you get it, then look at the spec with fresh eyes:"
+        },
+        {
+          "op": "replace",
+          "find": "description: \"You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.\"\n---",
+          "replace": "description: \"You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.\"\ndisable-model-invocation: true\n---"
         }
       ]
     },
