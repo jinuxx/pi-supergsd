@@ -114,8 +114,8 @@ export class TestHarness {
     this.session.dispose();
   }
 
-  getStatus(): string | undefined {
-    return this.testSession.status;
+  lastNotification(): string | undefined {
+    return this.testSession.lastNotification;
   }
 
   assertSession(...expected: TestSessionEntry[]): void {
@@ -130,13 +130,6 @@ export class TestHarness {
         `Expected session to contain entry: ${JSON.stringify(expectedEntry)}`,
       );
     }
-  }
-
-  assertTaskStatusHistoryIncludes(expected: string | undefined): void {
-    assert.ok(
-      this.testSession.taskStatusHistory.includes(expected),
-      `Expected task status history to include ${JSON.stringify(expected)}`,
-    );
   }
 
   async waitForIdle(): Promise<void> {

@@ -5,9 +5,9 @@ import { describe, it, type TestContext } from "node:test";
 import {
   aborts,
   assistant,
-  notification,
   pushTask,
   responds,
+  status,
   task,
   thinks,
   user,
@@ -19,7 +19,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
   it("creates a real session and registers push-task through the extension", async (t) => {
     const h = await makeHarness(t);
     assert.ok(h.registeredToolNames().includes("push-task"));
-    assert.strictEqual(h.getStatus(), undefined);
+    assert.strictEqual(h.lastNotification(), undefined);
   });
 
   it("uses MockLLM prompt rules for h.prompt()", async (t) => {
@@ -36,7 +36,8 @@ describe("AgentSession-backed TestHarness foundation", () => {
 
     await h.prompt("/start-task");
 
-    h.assertSession(notification("No pending task. Use push-task first."));
+    h.assertSession();
+    assert.strictEqual(h.lastNotification(), "No pending task. Use push-task first.");
   });
 
   it("supports thinking and aborted response descriptors", async (t) => {
@@ -60,7 +61,11 @@ describe("AgentSession-backed TestHarness foundation", () => {
       user("delegate work"),
       assistant("", "toolUse"),
       task("subtask", true),
-      notification("Task stored. Use `/start-task` or `/auto` to start it."),
+      status("pending task: subtask"),
+    );
+    assert.strictEqual(
+      h.lastNotification(),
+      "Task stored. Use `/start-task` or `/auto` to start it.",
     );
   });
 
@@ -102,7 +107,11 @@ describe("AgentSession-backed TestHarness foundation", () => {
       user("Analyze X"),
       assistant("preparing subagent", "toolUse"),
       task("Detailed X analysis"),
-      notification("Task stored. Use `/start-task` or `/auto` to start it."),
+      status("pending task: detailed-x-analysis"),
+    );
+    assert.strictEqual(
+      h.lastNotification(),
+      "Task stored. Use `/start-task` or `/auto` to start it.",
     );
   });
 
@@ -114,7 +123,12 @@ describe("AgentSession-backed TestHarness foundation", () => {
     await h.prompt("main work");
     await h.prompt("/start-task");
 
-    h.assertSession(user("Task AAA"), assistant("Done."));
+    h.assertSession(
+      status(),
+      user("Task AAA"),
+      assistant("Done."),
+      status("current task: task-aaa"),
+    );
     h.assertSessionContains(
       user("main work"),
       assistant("working...", "toolUse"),
@@ -139,6 +153,7 @@ describe("AgentSession-backed TestHarness foundation", () => {
       user("queue follow-up"),
       assistant("", "toolUse"),
       task("follow-up"),
+      status("pending task: follow-up"),
       user("answer follow-up"),
       assistant("queued response"),
     );
