@@ -6,7 +6,7 @@ import {
   notification,
   responds,
   pushTask,
-  run,
+  TestNode,
   task,
   taskResult,
   user,
@@ -15,7 +15,7 @@ import {
 import { describe } from "node:test";
 
 describe("manual workflow", () => {
-  run(
+  TestNode.run(
     node("push AAA", async (h) => {
       h.llm.onPrompt("main work", responds("working..."), pushTask("Task AAA"));
       h.llm.onPrompt("Task AAA", responds("Done."));

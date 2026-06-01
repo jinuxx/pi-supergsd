@@ -8,7 +8,7 @@ export function node(name: string, fn: NodeFn) {
 
 type NodeFn = (h: TestHarness) => Promise<void> | void;
 
-class TestNode {
+export class TestNode {
   constructor(
     private readonly name: string,
     private readonly fn?: NodeFn,
@@ -54,6 +54,3 @@ class TestNode {
     }
   }
 }
-
-// eslint-disable-next-line unslop/no-single-use-constants -- public API for test authors
-export const run = TestNode.run;
