@@ -28,6 +28,11 @@
           "op": "replace",
           "find": "## Integration with Workflows\n\n**Subagent-Driven Development:**\n- Review after EACH task\n- Catch issues before they compound\n- Fix before moving to next task\n\n**Executing Plans:**",
           "replace": "## Integration with Workflows\n\n**Executing Plans:**"
+        },
+        {
+          "op": "replace",
+          "find": "description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements\n---",
+          "replace": "description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements\ndisable-model-invocation: true\n---"
         }
       ]
     },
