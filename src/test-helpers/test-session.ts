@@ -21,7 +21,9 @@ export function assumeCommandContext<T extends object>(value: T): ExtensionComma
 // ---------------------------------------------------------------------------
 
 export function durableEntries(entries: PiSessionEntry[]): DurableSessionEntry[] {
-  return entries.map(toDurableEntry).filter((entry): entry is DurableSessionEntry => entry !== null);
+  return entries
+    .map(toDurableEntry)
+    .filter((entry): entry is DurableSessionEntry => entry !== null);
 }
 
 export type DurableSessionEntry = Exclude<SessionEntry, NotificationEntry>;
@@ -164,7 +166,10 @@ function toDurableEntry(entry: PiSessionEntry): DurableSessionEntry | null {
         return user(textContent(entry.message.content));
       }
       if (entry.message.role === "assistant") {
-        return assistant(textContent(entry.message.content), visibleStopReason(entry.message.stopReason));
+        return assistant(
+          textContent(entry.message.content),
+          visibleStopReason(entry.message.stopReason),
+        );
       }
       return null;
     case "custom":
@@ -190,7 +195,11 @@ function visibleStopReason(stopReason: unknown): string | undefined {
 }
 
 function isTaskData(value: unknown): value is { prompt: string; inherit_context: boolean } {
-  return isRecord(value) && typeof value.prompt === "string" && typeof value.inherit_context === "boolean";
+  return (
+    isRecord(value) &&
+    typeof value.prompt === "string" &&
+    typeof value.inherit_context === "boolean"
+  );
 }
 
 function hasSlug(value: unknown): value is { slug: string } {

@@ -155,7 +155,10 @@ export class TestHarness {
       waitForIdle: async () => {
         await this.scanAndReactLoop();
       },
-      navigateTree: async (targetId: string, options?: Parameters<AgentSession["navigateTree"]>[1]) => {
+      navigateTree: async (
+        targetId: string,
+        options?: Parameters<AgentSession["navigateTree"]>[1],
+      ) => {
         if (this.cancelNextNav) {
           this.cancelNextNav = false;
           return { cancelled: true };
@@ -235,7 +238,11 @@ export class TestHarness {
   private throwIfNewAssistantError(knownEntryIds: ReadonlySet<string>): void {
     const assistantError = this.sessionManager.getEntries().find((entry) => {
       if (knownEntryIds.has(entry.id)) return false;
-      return entry.type === "message" && entry.message.role === "assistant" && entry.message.stopReason === "error";
+      return (
+        entry.type === "message" &&
+        entry.message.role === "assistant" &&
+        entry.message.stopReason === "error"
+      );
     });
 
     if (assistantError?.type === "message" && assistantError.message.role === "assistant") {

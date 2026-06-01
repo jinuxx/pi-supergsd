@@ -268,7 +268,11 @@ describe("automated workflow", () => {
         assistant(""),
       );
       // The subtask entries should be in the whole-session history
-      h.assertSessionContains(user("subtask"), assistant("sub done"), taskResult("subtask", "sub done"));
+      h.assertSessionContains(
+        user("subtask"),
+        assistant("sub done"),
+        taskResult("subtask", "sub done"),
+      );
     } finally {
       h.dispose();
     }

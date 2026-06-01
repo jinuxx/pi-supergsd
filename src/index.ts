@@ -36,12 +36,16 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
 
       const promptLines = args.prompt.split("\n");
       const maxLines = context.expanded ? promptLines.length : 7;
-      const displayLines = promptLines.slice(0, maxLines).map((l) => theme.fg("dim", l.trimEnd() || " "));
+      const displayLines = promptLines
+        .slice(0, maxLines)
+        .map((l) => theme.fg("dim", l.trimEnd() || " "));
 
       if (!context.expanded && promptLines.length > maxLines) {
         const totalLines = promptLines.length;
         const moreLines = totalLines - maxLines;
-        displayLines.push(theme.fg("muted", `... (${moreLines} more lines, ${totalLines} total, ctrl+o to expand)`));
+        displayLines.push(
+          theme.fg("muted", `... (${moreLines} more lines, ${totalLines} total, ctrl+o to expand)`),
+        );
       }
 
       return new Text([header, ...displayLines].join("\n"), 0, 0);
@@ -195,7 +199,11 @@ export function cmdAuto(pi: AutoCommandAPI): CommandOptions {
   };
 }
 
-export const rendererTaskResult: MessageRenderer<{ slug?: string }> = (message, _options, theme): Box => {
+export const rendererTaskResult: MessageRenderer<{ slug?: string }> = (
+  message,
+  _options,
+  theme,
+): Box => {
   const label = message.details?.slug
     ? theme.fg("customMessageLabel", `${message.details.slug} result:`)
     : theme.fg("customMessageLabel", "result:");
@@ -254,7 +262,11 @@ type TaskActionOptions = {
 function lastAssistantWasAborted(session: ReadonlySessionLike): boolean {
   const branch = session.getBranch();
   const last = branch[branch.length - 1];
-  return last?.type === "message" && last.message.role === "assistant" && last.message.stopReason === "aborted";
+  return (
+    last?.type === "message" &&
+    last.message.role === "assistant" &&
+    last.message.stopReason === "aborted"
+  );
 }
 
 async function startTask(
@@ -325,7 +337,9 @@ async function finishTask(
   // are valid for custom_message content; provider-specific thinking/tool blocks
   // must not be replayed into the parent branch.
   const lastAssistant = findLastEntry(ctx.sessionManager, isAssistantMessageEntry);
-  const lastAssistantContent = lastAssistant ? taskResultTextContent(lastAssistant.message.content) : undefined;
+  const lastAssistantContent = lastAssistant
+    ? taskResultTextContent(lastAssistant.message.content)
+    : undefined;
   const lastAssistantId = lastAssistant?.id;
 
   // Find the task prompt on the current branch for the slug label
@@ -363,7 +377,10 @@ async function finishTask(
 
 type TaskCommandAPI = Pick<ExtensionAPI, "appendEntry" | "sendMessage" | "sendUserMessage">;
 
-async function abortTask(ctx: ExtensionCommandContext, options: TaskActionOptions = {}): Promise<TaskActionResult> {
+async function abortTask(
+  ctx: ExtensionCommandContext,
+  options: TaskActionOptions = {},
+): Promise<TaskActionResult> {
   const taskStart = currentTask(ctx.sessionManager);
   if (!taskStart) {
     ctx.ui.notify("Not inside task, nothing to abort.", "warning");
@@ -468,7 +485,10 @@ function findTaskPrompt(session: ReadonlySessionLike): string | undefined {
   return undefined;
 }
 
-function findLastEntryIndex(session: ReadonlySessionLike, predicate: (entry: SessionEntry) => boolean): number {
+function findLastEntryIndex(
+  session: ReadonlySessionLike,
+  predicate: (entry: SessionEntry) => boolean,
+): number {
   const branch = session.getBranch();
   for (let i = branch.length - 1; i >= 0; i--) {
     if (predicate(branch[i])) return i;
@@ -537,7 +557,11 @@ type TaskEntry = CustomEntry<typeof TASK_ENTRY_TYPE, TaskData>;
 const TASK_ENTRY_TYPE = "task";
 
 function isTaskData(value: unknown): value is TaskData {
-  return isRecord(value) && typeof value.prompt === "string" && typeof value.inherit_context === "boolean";
+  return (
+    isRecord(value) &&
+    typeof value.prompt === "string" &&
+    typeof value.inherit_context === "boolean"
+  );
 }
 
 interface TaskData {

@@ -21,7 +21,10 @@ export class MockUser {
   }
 }
 
-export type MockUserAction = ReturnType<typeof userEsc> | ReturnType<typeof userCtrlC> | ReturnType<typeof userPrompts>;
+export type MockUserAction =
+  | ReturnType<typeof userEsc>
+  | ReturnType<typeof userCtrlC>
+  | ReturnType<typeof userPrompts>;
 
 export const userEsc = () => ({ type: "user-esc" as const });
 

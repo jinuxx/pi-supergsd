@@ -51,7 +51,11 @@ describe("TestSession", () => {
     session.context.notify("first");
     session.context.notify("second");
 
-    assert.deepStrictEqual(session.entries(), [user("main work"), notification("first"), notification("second")]);
+    assert.deepStrictEqual(session.entries(), [
+      user("main work"),
+      notification("first"),
+      notification("second"),
+    ]);
   });
 
   it("omits notifications anchored to entries outside the current branch", () => {

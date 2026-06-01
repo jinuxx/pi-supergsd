@@ -18,7 +18,9 @@ describe("applyPatches", () => {
   });
 
   it("applies regex-replace with capture groups", () => {
-    const result = applyPatches("Hello World", [{ op: "regex-replace", find: "Hello (\\w+)", replace: "Hi $1" }]);
+    const result = applyPatches("Hello World", [
+      { op: "regex-replace", find: "Hello (\\w+)", replace: "Hi $1" },
+    ]);
     assert.strictEqual(result.result, "Hi World");
     assert.deepStrictEqual(result.unmatched, []);
   });
@@ -37,7 +39,9 @@ describe("applyPatches", () => {
   });
 
   it("deletes blocks from start to end line inclusive", () => {
-    const result = applyPatches("start\na\nb\nend\nc", [{ op: "delete-block", findStart: "start", findEnd: "end" }]);
+    const result = applyPatches("start\na\nb\nend\nc", [
+      { op: "delete-block", findStart: "start", findEnd: "end" },
+    ]);
     assert.strictEqual(result.result, "c");
     assert.deepStrictEqual(result.unmatched, []);
   });

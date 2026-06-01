@@ -1,6 +1,15 @@
 import assert from "node:assert";
 
-import { assistant, node, notification, responds, pushTask, task, taskResult, user } from "./test-helpers/index.js";
+import {
+  assistant,
+  node,
+  notification,
+  responds,
+  pushTask,
+  task,
+  taskResult,
+  user,
+} from "./test-helpers/index.js";
 
 import { describe } from "node:test";
 
@@ -777,7 +786,11 @@ describe("manual workflow", () => {
     await h.prompt("main work");
     await h.prompt("/start-task");
     assert.strictEqual(h.getStatus(), undefined);
-    h.assertSession(user("main work"), assistant("working..."), notification("No pending task. Use push-task first."));
+    h.assertSession(
+      user("main work"),
+      assistant("working..."),
+      notification("No pending task. Use push-task first."),
+    );
   }).run();
 
   node("discard [no task]", async (h) => {
@@ -785,7 +798,11 @@ describe("manual workflow", () => {
     await h.prompt("main work");
     await h.prompt("/discard-task");
     assert.strictEqual(h.getStatus(), undefined);
-    h.assertSession(user("main work"), assistant("working..."), notification("No pending task to discard."));
+    h.assertSession(
+      user("main work"),
+      assistant("working..."),
+      notification("No pending task to discard."),
+    );
   }).run();
 
   node("finish [no task]", async (h) => {
@@ -793,7 +810,11 @@ describe("manual workflow", () => {
     await h.prompt("main work");
     await h.prompt("/finish-task");
     assert.strictEqual(h.getStatus(), undefined);
-    h.assertSession(user("main work"), assistant("working..."), notification("Not inside task, nothing to finish."));
+    h.assertSession(
+      user("main work"),
+      assistant("working..."),
+      notification("Not inside task, nothing to finish."),
+    );
   }).run();
 
   node("abort [no task]", async (h) => {
@@ -801,6 +822,10 @@ describe("manual workflow", () => {
     await h.prompt("main work");
     await h.prompt("/abort-task");
     assert.strictEqual(h.getStatus(), undefined);
-    h.assertSession(user("main work"), assistant("working..."), notification("Not inside task, nothing to abort."));
+    h.assertSession(
+      user("main work"),
+      assistant("working..."),
+      notification("Not inside task, nothing to abort."),
+    );
   }).run();
 });

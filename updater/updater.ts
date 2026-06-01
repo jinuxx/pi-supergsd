@@ -2,7 +2,12 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { applyPatches, superpowersUpdate, superpowersGetSkill, superpowersGetFile } from "./utils/index.js";
+import {
+  applyPatches,
+  superpowersUpdate,
+  superpowersGetSkill,
+  superpowersGetFile,
+} from "./utils/index.js";
 import type { SkillDefinition, Patch } from "./utils/index.js";
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
@@ -60,7 +65,10 @@ async function main(): Promise<void> {
       const perFilePatches = getPatchesForFile(def, relativePath);
 
       // Per-file patches first (against original upstream content)
-      const { result: afterPerFile, unmatched: perFileUnmatched } = applyPatches(raw, perFilePatches);
+      const { result: afterPerFile, unmatched: perFileUnmatched } = applyPatches(
+        raw,
+        perFilePatches,
+      );
 
       // Common patches second (best-effort — only warn if unmatched)
       const { result, unmatched: commonUnmatched } = applyPatches(afterPerFile, commonPatches);
