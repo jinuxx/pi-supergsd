@@ -1,4 +1,4 @@
-export { assistant, task, taskResult, user, TestSession } from "./test-session.js";
+export { assistant, task, taskResult, user } from "./test-session.js";
 
 export { MockLLM, aborts, pushTask, responds, thinks } from "./mock-llm.js";
 
