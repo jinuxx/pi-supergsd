@@ -112,25 +112,20 @@ describe("automated workflow", () => {
 
   it("stops when the last assistant message was aborted", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("start", responds(""));
-    h.llm.onPrompt("", responds(""));
+    h.llm.onPrompt("start", responds(""), pushTask("Implement phase 1.", true));
+
+    // Task-execution
     h.llm.onPrompt("Implement phase 1.", aborts("Stopped by user."));
-    h.llm.onPrompt("queue implement", pushTask("Implement phase 1.", true));
+
+    // Leaf continuation (triggered when auto re-prompts after abort detection)
+    h.llm.onPrompt("", responds(""));
+
     try {
       await h.prompt("start");
-      await h.prompt("queue implement");
 
       await h.prompt("/auto");
 
-      h.assertSession(
-        user("start"),
-        assistant(""),
-        user("queue implement"),
-        assistant("", "toolUse"),
-        task("Implement phase 1.", true),
-        user("Implement phase 1."),
-        assistant("Stopped by user.", "aborted"),
-      );
+      h.assertSession(user("start"), assistant("", "toolUse"), task("Implement phase 1.", true), user("Implement phase 1."), assistant("Stopped by user.", "aborted"));
       h.assertStatus("current task: implement-phase-1");
     } finally {
       h.dispose();
