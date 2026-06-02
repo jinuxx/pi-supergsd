@@ -63,22 +63,15 @@ describe("automated workflow", () => {
 
   it("stops when navigation is cancelled and does not mark the task done", async () => {
     const h = await TestHarness.create();
-    h.llm.onPrompt("main work", responds(""));
-    h.llm.onPrompt("queue analyze", pushTask("Analyze performance."));
+    h.llm.onPrompt("main work", responds(""), pushTask("Analyze performance."));
+
     h.user.onQueuedTask("Analyze performance.", userEsc());
     try {
       await h.prompt("main work");
-      await h.prompt("queue analyze");
 
       await h.prompt("/auto");
 
-      h.assertSession(
-        user("main work"),
-        assistant(""),
-        user("queue analyze"),
-        assistant("", "toolUse"),
-        task("Analyze performance."),
-      );
+      h.assertSession(user("main work"), assistant("", "toolUse"), task("Analyze performance."));
       h.assertStatus("pending task: analyze-performance");
     } finally {
       h.dispose();
