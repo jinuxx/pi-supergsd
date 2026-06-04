@@ -85,10 +85,7 @@ function maybeRewriteAssistantEsc(
 
   if (!shouldAbort) return message;
 
-  const cutoff = Math.floor(visibleText.length / 2);
-  return piAi.fauxAssistantMessage([piAi.fauxText(visibleText.slice(0, cutoff))], {
-    stopReason: "aborted",
-  });
+  return piAi.fauxAssistantMessage("", { stopReason: "aborted" });
 }
 
 function makeAssistantMessage(responses: MockLLMDescriptor[]): AssistantMessage {

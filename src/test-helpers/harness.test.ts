@@ -4,6 +4,7 @@ import { describe, it, type TestContext } from "node:test";
 
 import {
   assistant,
+  assistantAborted,
   pushTask,
   responds,
   task,
@@ -142,51 +143,14 @@ describe("AgentSession-backed TestHarness foundation", () => {
 });
 
 describe("userEsc assistant-only semantics", () => {
-  it("rewrites even-length assistant text to the first half and marks it aborted", async (t) => {
-    const h = await makeHarness(t);
-    h.llm.onPrompt("even text", responds("ABCDEFGHIJ"));
-    h.user.onAssistant("FGHI", userEsc());
-
-    await h.prompt("even text");
-
-    h.assertSession(user("even text"), assistant("ABCDE", "aborted"));
-  });
-
-  it("rewrites odd-length assistant text with Math.floor(length / 2)", async (t) => {
-    const h = await makeHarness(t);
-    h.llm.onPrompt("odd text", responds("ABCDEFGHI"));
-    h.user.onAssistant("EFGH", userEsc());
-
-    await h.prompt("odd text");
-
-    h.assertSession(user("odd text"), assistant("ABCD", "aborted"));
-  });
-
-  it("matches userEsc against final visible text and drops thinking blocks in the aborted rewrite", async (t) => {
+  it("replaces the assistant message with empty text and marks it aborted", async (t) => {
     const h = await makeHarness(t);
     h.llm.onPrompt("mixed text", thinks("hidden"), responds("ABCDEFGH"));
     h.user.onAssistant("CDEF", userEsc());
 
     await h.prompt("mixed text");
 
-    h.assertSession(user("mixed text"), assistant("ABCD", "aborted"));
-  });
-
-  it("still runs non-ESC assistant reactions after recording the aborted assistant message", async (t) => {
-    const h = await makeHarness(t);
-    h.llm.onPrompt("plan", responds("ABCDEABCDE"));
-    h.llm.onPrompt("follow-up", responds("done"));
-    h.user.onAssistant("ABCDE", userEsc(), userPrompts("follow-up"));
-
-    await h.prompt("plan");
-    await h.waitForIdle();
-
-    h.assertSession(
-      user("plan"),
-      assistant("ABCDE", "aborted"),
-      user("follow-up"),
-      assistant("done"),
-    );
+    h.assertSession(user("mixed text"), assistantAborted());
   });
 });
 

@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 
 import {
   assistant,
+  assistantAborted,
   responds,
   pushTask,
   task,
@@ -110,7 +111,7 @@ describe("automated workflow", () => {
     }
   });
 
-  it("stops when the last assistant message is rewritten to aborted half-text", async () => {
+  it("stops when the last assistant message is aborted to empty text", async () => {
     const h = await TestHarness.create();
     h.llm.onPrompt("start", responds(""), pushTask("Implement phase 1.", true));
 
@@ -127,7 +128,7 @@ describe("automated workflow", () => {
         assistant("", "toolUse"),
         task("Implement phase 1.", true),
         user("Implement phase 1."),
-        assistant("ABCDE", "aborted"),
+        assistantAborted(),
       );
       h.assertStatus("current task: implement-phase-1");
     } finally {

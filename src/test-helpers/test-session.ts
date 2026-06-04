@@ -20,6 +20,7 @@ export class TestSession {
 export type SessionEntry =
   | ReturnType<typeof user>
   | ReturnType<typeof assistant>
+  | ReturnType<typeof assistantAborted>
   | ReturnType<typeof task>
   | ReturnType<typeof taskResult>;
 
@@ -43,6 +44,8 @@ export const assistant = (content: string, stopReason?: string) => ({
     ...(stopReason ? { stopReason } : {}),
   },
 });
+
+export const assistantAborted = () => assistant("", "aborted");
 
 export const task = (prompt: string, inherit_context = false) => ({
   type: "custom" as const,
