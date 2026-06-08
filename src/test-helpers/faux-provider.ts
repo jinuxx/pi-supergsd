@@ -23,6 +23,17 @@ export const FAUX_MODEL: Model<string> = {
   maxTokens: 4096,
 };
 
+export const FAUX_ALT_MODEL: Model<string> = {
+  ...FAUX_MODEL,
+  id: "alternate",
+  name: "Alternate Test Model",
+};
+
+export type FauxStreamCall = {
+  model: string;
+  reasoning?: SimpleStreamOptions["reasoning"];
+};
+
 export class FauxProvider {
   constructor(
     private readonly llm: MockLLM,
@@ -34,22 +45,27 @@ export class FauxProvider {
         api: FAUX_MODEL.api,
         provider: FAUX_PROVIDER,
         tokenSize: { min: 1, max: 1 },
-        models: [
-          {
-            id: FAUX_MODEL.id,
-            name: FAUX_MODEL.name,
-            reasoning: FAUX_MODEL.reasoning,
-            input: [...FAUX_MODEL.input],
-            cost: FAUX_MODEL.cost,
-            contextWindow: FAUX_MODEL.contextWindow,
-            maxTokens: FAUX_MODEL.maxTokens,
-          },
-        ],
+        models: [FAUX_MODEL, FAUX_ALT_MODEL].map((model) => ({
+          id: model.id,
+          name: model.name,
+          reasoning: model.reasoning,
+          input: [...model.input],
+          cost: model.cost,
+          contextWindow: model.contextWindow,
+          maxTokens: model.maxTokens,
+        })),
       }),
     );
   }
 
+  readonly streamCalls: FauxStreamCall[] = [];
+
   stream(model: Model<string>, context: Context, options?: SimpleStreamOptions) {
+    this.streamCalls.push({
+      model: `${model.provider}/${model.id}`,
+      reasoning: options?.reasoning,
+    });
+
     const lastUser = [...context.messages].reverse().find((message) => message.role === "user");
     const promptText = extractTextContent(lastUser?.content ?? "") ?? "";
     const responses = this.llm.matchPrompt(promptText);
@@ -101,6 +117,10 @@ function makeAssistantMessage(responses: MockLLMDescriptor[]): AssistantMessage 
           {
             prompt: descriptor.prompt,
             inherit_context: descriptor.inherit_context,
+            ...(descriptor.model !== undefined ? { model: descriptor.model } : {}),
+            ...(descriptor.thinking_level !== undefined
+              ? { thinking_level: descriptor.thinking_level }
+              : {}),
           },
           { id: `call-${index + 1}` },
         );

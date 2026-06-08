@@ -19,7 +19,7 @@ import { isDeepStrictEqual } from "node:util";
 import { extractTextContent } from "../text-content.js";
 import { type SessionEntry as TestSessionEntry, TestSession } from "./test-session.js";
 import { TestUi } from "./test-ui.js";
-import { FAUX_MODEL, FAUX_PROVIDER, FauxProvider } from "./faux-provider.js";
+import { FAUX_ALT_MODEL, FAUX_MODEL, FAUX_PROVIDER, FauxProvider } from "./faux-provider.js";
 import { MockLLM } from "./mock-llm.js";
 import { MockUser, type MockUserAction } from "./mock-user.js";
 
@@ -59,20 +59,18 @@ export class TestHarness {
             baseUrl: FAUX_MODEL.baseUrl,
             apiKey: "test-key",
             streamSimple: (model, context, options) => fauxProvider.stream(model, context, options),
-            models: [
-              {
-                id: FAUX_MODEL.id,
-                name: FAUX_MODEL.name,
-                api: FAUX_MODEL.api,
-                baseUrl: FAUX_MODEL.baseUrl,
-                reasoning: FAUX_MODEL.reasoning,
-                thinkingLevelMap: FAUX_MODEL.thinkingLevelMap,
-                input: [...FAUX_MODEL.input],
-                cost: FAUX_MODEL.cost,
-                contextWindow: FAUX_MODEL.contextWindow,
-                maxTokens: FAUX_MODEL.maxTokens,
-              },
-            ],
+            models: [FAUX_MODEL, FAUX_ALT_MODEL].map((model) => ({
+              id: model.id,
+              name: model.name,
+              api: model.api,
+              baseUrl: model.baseUrl,
+              reasoning: model.reasoning,
+              thinkingLevelMap: model.thinkingLevelMap,
+              input: [...model.input],
+              cost: model.cost,
+              contextWindow: model.contextWindow,
+              maxTokens: model.maxTokens,
+            })),
           });
         },
         registerSuperGsd,
@@ -151,6 +149,19 @@ export class TestHarness {
       .getAllTools()
       .map((tool) => tool.name)
       .sort();
+  }
+
+  streamCalls(): { model: string; reasoning?: string }[] {
+    return this.fauxProvider.streamCalls.map((call) => ({ ...call }));
+  }
+
+  currentModel(): string | undefined {
+    const model = this.session.model;
+    return model ? `${model.provider}/${model.id}` : undefined;
+  }
+
+  currentThinkingLevel(): string {
+    return this.session.thinkingLevel;
   }
 
   private commandContextActions() {
@@ -249,7 +260,7 @@ export class TestHarness {
 function isTaskEntryData(entry: SessionEntry): entry is SessionEntry & {
   type: "custom";
   customType: "task";
-  data: { prompt: string; inherit_context: boolean };
+  data: { prompt: string; inherit_context: boolean; model?: string; thinking_level?: string };
 } {
   return (
     entry.type === "custom" &&

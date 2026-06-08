@@ -30,9 +30,19 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
     ],
     parameters: pushTaskParameters,
     renderCall(args: PushTaskParams, theme, context) {
+      const tags: string[] = [];
+      if (args.model) {
+        tags.push(theme.fg("dim", `[model: ${args.model}]`));
+      }
+      if (args.thinking_level) {
+        tags.push(theme.fg("dim", `[thinking: ${args.thinking_level}]`));
+      }
+      if (args.inherit_context) {
+        tags.push(theme.fg("warning", "[inherit]"));
+      }
       const header =
         theme.fg("toolTitle", theme.bold("push-task")) +
-        (args.inherit_context ? " " + theme.fg("warning", "[inherit]") : "");
+        (tags.length > 0 ? " " + tags.join(" ") : "");
 
       const promptLines = args.prompt.split("\n");
       const maxLines = context.expanded ? promptLines.length : 7;
@@ -61,6 +71,8 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
       pi.appendEntry(TASK_ENTRY_TYPE, {
         prompt: params.prompt,
         inherit_context: params.inherit_context ?? false,
+        model: params.model,
+        thinking_level: params.thinking_level,
       });
 
       if (ctx.hasUI) {
@@ -73,6 +85,8 @@ export function toolPushTask(pi: PushTaskAPI): ToolDefinition {
         details: {
           prompt: params.prompt,
           inherit_context: params.inherit_context ?? false,
+          model: params.model,
+          thinking_level: params.thinking_level,
         },
         terminate: true,
       };
@@ -110,12 +124,12 @@ export function cmdFinishTask(pi: TaskCommandAPI): CommandOptions {
   };
 }
 
-export function cmdAbortTask(): CommandOptions {
+export function cmdAbortTask(pi: TaskCommandAPI): CommandOptions {
   return {
     description: "Abort the current task without finishing",
     handler: async (_args: string, ctx: ExtensionCommandContext) => {
       await ctx.waitForIdle();
-      await abortTask(ctx);
+      await abortTask(pi, ctx);
     },
   };
 }
@@ -293,11 +307,22 @@ async function startTask(
     const result = await ctx.navigateTree(freshTargetId, { summarize: false });
     if (result.cancelled) return "cancelled";
 
-    pi.appendEntry(TASK_START_ENTRY_TYPE, { returnTo: departureLeafId });
+    pi.appendEntry(TASK_START_ENTRY_TYPE, {
+      returnTo: departureLeafId,
+      ...originalTaskState(pi, ctx, activeTask.data),
+    });
   } else {
     pi.appendEntry(TASK_START_ENTRY_TYPE, {
       returnTo: ctx.sessionManager.getLeafId()!,
+      ...originalTaskState(pi, ctx, activeTask.data),
     });
+  }
+
+  if (activeTask.data.model) {
+    await applyModelSpec(pi, ctx, activeTask.data.model, "Task model");
+  }
+  if (activeTask.data.thinking_level) {
+    applyThinkingLevel(pi, ctx, activeTask.data.thinking_level, "Task thinking_level");
   }
 
   pi.sendUserMessage(activeTask.data.prompt);
@@ -351,6 +376,8 @@ async function finishTask(
   });
   if (result.cancelled) return "cancelled";
 
+  await restoreModelAndThinking(pi, ctx, taskStart);
+
   // Inject last assistant message after navigation
   if (lastAssistantId && lastAssistantContent !== undefined) {
     pi.sendMessage(
@@ -375,9 +402,8 @@ async function finishTask(
   refreshTaskStatus(ctx, { prefix: options.statusPrefix });
 }
 
-type TaskCommandAPI = Pick<ExtensionAPI, "appendEntry" | "sendMessage" | "sendUserMessage">;
-
 async function abortTask(
+  pi: TaskCommandAPI,
   ctx: ExtensionCommandContext,
   options: TaskActionOptions = {},
 ): Promise<TaskActionResult> {
@@ -392,12 +418,121 @@ async function abortTask(
   });
   if (result.cancelled) return "cancelled";
 
+  await restoreModelAndThinking(pi, ctx, taskStart);
+
   ctx.ui.notify("Task aborted. Branch abandoned without summary.", "info");
 
   refreshTaskStatus(ctx, { prefix: options.statusPrefix });
 }
 
 type TaskActionResult = "cancelled" | void;
+
+function originalTaskState(
+  pi: TaskCommandAPI,
+  ctx: ExtensionCommandContext,
+  taskData: TaskData,
+): Pick<TaskStartData, "originalModel" | "originalThinkingLevel"> {
+  const changesModel = !!taskData.model;
+  const changesThinkingLevel = changesModel || !!taskData.thinking_level;
+
+  return {
+    originalModel: changesModel && ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
+    originalThinkingLevel: changesThinkingLevel ? pi.getThinkingLevel() : undefined,
+  };
+}
+
+async function restoreModelAndThinking(
+  pi: TaskCommandAPI,
+  ctx: ExtensionCommandContext,
+  taskStart: TaskStartEntry,
+): Promise<void> {
+  const { originalModel, originalThinkingLevel } = taskStart.data;
+
+  if (originalModel) {
+    await applyModelSpec(pi, ctx, originalModel, "Original model");
+  }
+
+  if (originalThinkingLevel) {
+    applyThinkingLevel(pi, ctx, originalThinkingLevel, "Original thinking_level");
+  }
+}
+
+async function applyModelSpec(
+  pi: TaskCommandAPI,
+  ctx: ExtensionCommandContext,
+  modelSpec: string,
+  label: string,
+): Promise<void> {
+  const parsed = parseModelSpec(modelSpec);
+  if (!parsed) {
+    ctx.ui.notify(`${label} "${modelSpec}" must be in provider/model format.`, "warning");
+    return;
+  }
+
+  const model = ctx.modelRegistry.find(parsed.provider, parsed.modelId);
+  if (!model) {
+    ctx.ui.notify(`${label} "${modelSpec}" not found. Skipping model change.`, "warning");
+    return;
+  }
+
+  const success = await pi.setModel(model);
+  if (!success) {
+    ctx.ui.notify(
+      `${label} "${modelSpec}" has no configured API key. Skipping model change.`,
+      "warning",
+    );
+  }
+}
+
+function parseModelSpec(modelSpec: string): { provider: string; modelId: string } | null {
+  const separatorIndex = modelSpec.indexOf("/");
+  if (separatorIndex <= 0 || separatorIndex === modelSpec.length - 1) return null;
+
+  return {
+    provider: modelSpec.slice(0, separatorIndex),
+    modelId: modelSpec.slice(separatorIndex + 1),
+  };
+}
+
+function applyThinkingLevel(
+  pi: TaskCommandAPI,
+  ctx: ExtensionCommandContext,
+  thinkingLevel: string,
+  label: string,
+): void {
+  if (!isThinkingLevel(thinkingLevel)) {
+    ctx.ui.notify(`${label} "${thinkingLevel}" is not valid. Skipping thinking change.`, "warning");
+    return;
+  }
+
+  pi.setThinkingLevel(thinkingLevel);
+}
+
+type TaskCommandAPI = Pick<
+  ExtensionAPI,
+  | "appendEntry"
+  | "sendMessage"
+  | "sendUserMessage"
+  | "setModel"
+  | "setThinkingLevel"
+  | "getThinkingLevel"
+>;
+
+function isThinkingLevel(value: string): value is ThinkingLevel {
+  switch (value) {
+    case "off":
+    case "minimal":
+    case "low":
+    case "medium":
+    case "high":
+    case "xhigh":
+      return true;
+    default:
+      return false;
+  }
+}
+
+type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
 function refreshTaskStatus(ctx: TaskStatusContext, options: TaskStatusOptions = {}): void {
   if (ctx.hasUI) {
@@ -560,13 +695,17 @@ function isTaskData(value: unknown): value is TaskData {
   return (
     isRecord(value) &&
     typeof value.prompt === "string" &&
-    typeof value.inherit_context === "boolean"
+    typeof value.inherit_context === "boolean" &&
+    (value.model === undefined || typeof value.model === "string") &&
+    (value.thinking_level === undefined || typeof value.thinking_level === "string")
   );
 }
 
 interface TaskData {
   prompt: string;
   inherit_context: boolean;
+  model?: string;
+  thinking_level?: string;
 }
 
 function isTaskStartEntry(entry: SessionEntry): entry is TaskStartEntry {
@@ -592,11 +731,18 @@ type CustomEntry<TCustomType extends string, TData> = SessionEntry & {
 };
 
 function isTaskStartData(value: unknown): value is TaskStartData {
-  return isRecord(value) && typeof value.returnTo === "string";
+  return (
+    isRecord(value) &&
+    typeof value.returnTo === "string" &&
+    (value.originalModel === undefined || typeof value.originalModel === "string") &&
+    (value.originalThinkingLevel === undefined || typeof value.originalThinkingLevel === "string")
+  );
 }
 
 interface TaskStartData {
   returnTo: string;
+  originalModel?: string;
+  originalThinkingLevel?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -613,5 +759,26 @@ const pushTaskParameters = Type.Object({
       description:
         "Whether to inherit the current branch context instead of starting fresh. Never set it to true, unless explicitly requested by the user.",
     }),
+  ),
+  model: Type.Optional(
+    Type.String({
+      description:
+        "Optional model for the task in provider/model format, e.g. openai/gpt-5.5-codex.",
+    }),
+  ),
+  thinking_level: Type.Optional(
+    Type.Union(
+      [
+        Type.Literal("off"),
+        Type.Literal("minimal"),
+        Type.Literal("low"),
+        Type.Literal("medium"),
+        Type.Literal("high"),
+        Type.Literal("xhigh"),
+      ],
+      {
+        description: "Optional Pi thinking level for the task.",
+      },
+    ),
   ),
 });

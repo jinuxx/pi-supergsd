@@ -47,10 +47,20 @@ export const assistant = (content: string, stopReason?: string) => ({
 
 export const assistantAborted = () => assistant("", "aborted");
 
-export const task = (prompt: string, inherit_context = false) => ({
+export const task = (
+  prompt: string,
+  inherit_context = false,
+  model?: string,
+  thinking_level?: string,
+) => ({
   type: "custom" as const,
   customType: "task" as const,
-  data: { prompt, inherit_context },
+  data: {
+    prompt,
+    inherit_context,
+    ...(model !== undefined ? { model } : {}),
+    ...(thinking_level !== undefined ? { thinking_level } : {}),
+  },
 });
 
 export const taskResult = (slug: string, content?: string) => ({
@@ -88,7 +98,14 @@ function sessionEntries(entries: PiSessionEntry[]): SessionEntry[] {
         break;
       case "custom":
         if (entry.customType === "task" && isTaskData(entry.data)) {
-          result.push(task(entry.data.prompt, entry.data.inherit_context));
+          result.push(
+            task(
+              entry.data.prompt,
+              entry.data.inherit_context,
+              entry.data.model,
+              entry.data.thinking_level,
+            ),
+          );
         }
         break;
       case "custom_message":
@@ -112,7 +129,9 @@ function visibleStopReason(stopReason: unknown): string | undefined {
   return typeof stopReason === "string" && stopReason !== "stop" ? stopReason : undefined;
 }
 
-function isTaskData(value: unknown): value is { prompt: string; inherit_context: boolean } {
+function isTaskData(
+  value: unknown,
+): value is { prompt: string; inherit_context: boolean; model?: string; thinking_level?: string } {
   return (
     isRecord(value) &&
     typeof value.prompt === "string" &&

@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { describe, it } from "node:test";
 
 import {
@@ -227,6 +228,126 @@ describe("automated workflow", () => {
         assistant("working..."),
       );
       h.assertStatus("current task: shutdown-task");
+    } finally {
+      h.dispose();
+    }
+  });
+
+  it("applies and restores task-specific model and thinking_level", async () => {
+    const h = await TestHarness.create();
+    const originalThinkingLevel = h.currentThinkingLevel();
+    h.llm.onPrompt(
+      "main work",
+      responds("working..."),
+      pushTask("Optimize query.", false, "supergsd-test/alternate", "high"),
+    );
+
+    // Task-execution
+    h.llm.onPrompt("Optimize query.", responds("Query is 3x faster now."));
+    h.llm.onPrompt("Query is 3x faster now.", responds(""));
+
+    // Leaf continuation
+    h.llm.onPrompt("working...", responds(""));
+
+    try {
+      await h.prompt("main work");
+
+      await h.prompt("/auto");
+
+      h.assertSession(
+        user("main work"),
+        assistant("working...", "toolUse"),
+        task("Optimize query.", false, "supergsd-test/alternate", "high"),
+        taskResult("optimize-query", "Query is 3x faster now."),
+        assistant(""),
+      );
+      h.assertStatus();
+      assert.ok(
+        h
+          .streamCalls()
+          .some((call) => call.model === "supergsd-test/alternate" && call.reasoning === "high"),
+      );
+      assert.strictEqual(h.currentModel(), "supergsd-test/deterministic");
+      assert.strictEqual(h.currentThinkingLevel(), originalThinkingLevel);
+    } finally {
+      h.dispose();
+    }
+  });
+
+  it("stores thinking_level only when model is not specified", async () => {
+    const h = await TestHarness.create();
+    const originalThinkingLevel = h.currentThinkingLevel();
+    h.llm.onPrompt(
+      "main work",
+      responds("working..."),
+      pushTask("Quick check.", false, undefined, "low"),
+    );
+
+    // Task-execution
+    h.llm.onPrompt("Quick check.", responds("All good."));
+    h.llm.onPrompt("All good.", responds(""));
+
+    // Leaf continuation
+    h.llm.onPrompt("working...", responds(""));
+
+    try {
+      await h.prompt("main work");
+
+      await h.prompt("/auto");
+
+      h.assertSession(
+        user("main work"),
+        assistant("working...", "toolUse"),
+        task("Quick check.", false, undefined, "low"),
+        taskResult("quick-check", "All good."),
+        assistant(""),
+      );
+      h.assertStatus();
+      assert.ok(
+        h
+          .streamCalls()
+          .some((call) => call.model === "supergsd-test/deterministic" && call.reasoning === "low"),
+      );
+      assert.strictEqual(h.currentModel(), "supergsd-test/deterministic");
+      assert.strictEqual(h.currentThinkingLevel(), originalThinkingLevel);
+    } finally {
+      h.dispose();
+    }
+  });
+
+  it("restores model and thinking_level after aborting a task", async () => {
+    const h = await TestHarness.create();
+    const originalThinkingLevel = h.currentThinkingLevel();
+    h.llm.onPrompt(
+      "main work",
+      responds("working..."),
+      pushTask("Risky task.", false, "supergsd-test/alternate", "high"),
+    );
+    h.llm.onPrompt("Risky task.", responds("partial result"));
+
+    try {
+      await h.prompt("main work");
+
+      await h.prompt("/start-task");
+      assert.strictEqual(h.currentModel(), "supergsd-test/alternate");
+      assert.strictEqual(h.currentThinkingLevel(), "high");
+
+      await h.prompt("/abort-task");
+
+      h.assertSession(
+        user("main work"),
+        assistant("working...", "toolUse"),
+        task("Risky task.", false, "supergsd-test/alternate", "high"),
+      );
+      h.assertStatus("pending task: risky-task");
+      h.assertLastNotification("Task aborted. Branch abandoned without summary.");
+      assert.ok(
+        h
+          .streamCalls()
+          .some((call) => call.model === "supergsd-test/alternate" && call.reasoning === "high"),
+      );
+      assert.strictEqual(h.currentModel(), "supergsd-test/deterministic");
+      assert.strictEqual(h.currentThinkingLevel(), originalThinkingLevel);
     } finally {
       h.dispose();
     }

@@ -34,10 +34,17 @@ export const thinks = (text: string) => ({
   text,
 });
 
-export const pushTask = (prompt: string, inherit_context = false) => ({
+export const pushTask = (
+  prompt: string,
+  inherit_context = false,
+  model?: string,
+  thinking_level?: string,
+) => ({
   type: "response:push-task" as const,
   prompt,
   inherit_context,
+  model,
+  thinking_level,
 });
 
 type PromptRule = {

@@ -16,7 +16,7 @@ export default function register(pi: ExtensionAPI): void {
   pi.registerCommand("start-task", cmdStartTask(pi));
   pi.registerCommand("discard-task", cmdDiscardTask(pi));
   pi.registerCommand("finish-task", cmdFinishTask(pi));
-  pi.registerCommand("abort-task", cmdAbortTask());
+  pi.registerCommand("abort-task", cmdAbortTask(pi));
   pi.registerCommand("auto", cmdAuto(pi));
 
   pi.registerMessageRenderer("task-result", rendererTaskResult);
