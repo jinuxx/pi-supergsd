@@ -2,7 +2,7 @@ export function makeSlug(prompt: string): string {
   const words = prompt
     .split(/\s+/)
     .filter((w) => !STOPWORDS.has(w.toLowerCase()))
-    .map((w) => w.toLowerCase().replace(/^[^\w]+|[^\w]+$/g, ""))
+    .map((w) => w.toLowerCase().replace(/^[^\p{L}\p{N}_]+|[^\p{L}\p{N}_]+$/gu, ""))
     .filter((w) => w.length > 0);
   if (words.length === 0) return "<no description>";
 

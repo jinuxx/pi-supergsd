@@ -58,6 +58,15 @@ describe("AgentSession-backed TestHarness foundation", () => {
     h.assertLastNotification("Task stored. Use `/start-task` or `/auto` to start it.");
   });
 
+  it("shows Chinese task prompts in the status slug", async (t) => {
+    const h = await makeHarness(t);
+    h.llm.onPrompt("delegate work", pushTask("今天天气如何？"));
+
+    await h.prompt("delegate work");
+    h.assertSession(user("delegate work"), assistant("", "toolUse"), task("今天天气如何？"));
+    h.assertStatus("pending task: 今天天气如何");
+  });
+
   it("fails when the faux provider receives an unmatched prompt", async (t) => {
     const h = await makeHarness(t);
     await assert.rejects(
